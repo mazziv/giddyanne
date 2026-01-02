@@ -1,16 +1,40 @@
 # Installation
 
-The `giddy` binary needs the Python server code to run. Two options:
+**Platforms:** macOS, Linux
 
-## Option 1: Pre-built binary (no Go required)
+## Prerequisites
+
+- Python 3.11+
+- Go 1.21+ (or use pre-built binary)
+
+## Build from Source
 
 ```bash
-# Clone the repo
-git clone https://github.com/mazziv/giddyanne.git
+git clone --depth 1 --branch v1.1.1 https://github.com/mazziv/giddyanne.git
+cd giddyanne
+make install
+```
+
+This builds the CLI, creates a Python virtualenv, and symlinks `giddy` to `~/bin`.
+
+To install elsewhere:
+
+```bash
+make install BIN_DIR=/usr/local/bin  # or any directory in your PATH
+```
+
+## Pre-built Binary
+
+If you don't have Go installed:
+
+```bash
+# Clone the repo (needed for Python server code)
+git clone --depth 1 --branch v1.1.1 https://github.com/mazziv/giddyanne.git
 cd giddyanne
 
-# Download the binary for your platform from Releases
-# and move it into the repo root (same directory as main.py)
+# Download binary for your platform from Releases:
+# https://github.com/mazziv/giddyanne/releases
+# Move it into the repo root (same directory as main.py)
 
 # On macOS, clear the quarantine flag
 xattr -d com.apple.quarantine giddy
@@ -18,18 +42,37 @@ xattr -d com.apple.quarantine giddy
 # Set up Python environment
 make python
 
-# Add to PATH (symlink preserves the path to Python code)
+# Symlink to PATH (preserves path to Python code)
 ln -sf "$(pwd)/giddy" ~/bin/giddy
 ```
 
-Requires Python 3.10+.
+## First Run
 
-## Option 2: Build from source
+First install downloads dependencies (~2GB for PyTorch). This is a one-time download.
+
+First search downloads the embedding model (~90MB). Also one-time.
+
+Initial indexing takes time depending on codebase size:
+- ~750 files: ~45 seconds on M1 Pro
+- Runs once at startup, then watches for changes
+- Subsequent starts are faster (unchanged files use cached embeddings)
+
+## Verify Installation
 
 ```bash
-git clone https://github.com/mazziv/giddyanne.git
-cd giddyanne
-make install   # Builds Go + Python, symlinks to ~/bin
+giddy help
+# Shows available commands
 ```
 
-Requires Go 1.21+ and Python 3.10+.
+## Uninstall
+
+```bash
+# Remove symlink
+rm ~/bin/giddy  # or wherever you installed it
+
+# Remove the repo
+rm -rf /path/to/giddyanne
+
+# Optional: remove cached models
+rm -rf ~/.cache/huggingface/hub/models--sentence-transformers--all-MiniLM-L6-v2
+```
