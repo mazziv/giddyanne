@@ -4,8 +4,6 @@ Semantic codebase search. Indexes your files with embeddings and lets you find c
 
 **Current version: 1.1.1** · [Changelog](CHANGELOG.md) · [User Guide](GUIDE.md)
 
-## Features
-
 - **Semantic search**: Find code by meaning ("auth logic" finds `login.py`)
 - **Real-time indexing**: Watches for file changes and re-indexes automatically
 - **Project config**: Define paths + descriptions in `.giddyanne.yaml`
@@ -13,7 +11,53 @@ Semantic codebase search. Indexes your files with embeddings and lets you find c
 - **Private**: Keeps your code on your machine
 - **Fast**: Pre-indexed embeddings, search in milliseconds
 
-## Supported Languages
+## Project Summary
+
+### Quick Start
+
+```bash
+# After install and setup...
+
+giddyanne · main ⟩ giddy up
+> Starting server...
+> Server started on port 8000
+
+giddyanne · main ⟩ giddy health
+> Indexed files: 28
+> Total chunks:  288
+> Index size:    3.85 MB
+> Startup time:  10504 ms
+> Avg latency:   (no queries yet)
+
+giddyanne · main ⟩ giddy find --verbose --limit 1 formatting functions
+> 
+> cmd/giddy/main.go:889-906 (0.31)
+>   func formatBytes(bytes int64) string {
+>         const (
+>                 KB = 1024
+>                 MB = KB * 1024
+>                 GB = MB * 1024
+>         )
+>         switch {
+>         case bytes >= GB:
+>                 return fmt.Sprintf("%.2f GB", float64(bytes)/GB)
+>         case bytes >= MB:
+>                 return fmt.Sprintf("%.2f MB", float64(bytes)/MB)
+>         case bytes >= KB:
+>                 return fmt.Sprintf("%.2f KB", float64(bytes)/KB)
+>         default:
+>                 return fmt.Sprintf("%d bytes", bytes)
+>         }
+>   }
+
+giddyanne · main ⟩ giddy down
+> Server stopped
+
+giddyanne · main ⟩ giddy status
+> Not running
+```
+
+### Supported Languages
 
 Only files with supported extensions are indexed. Code is split at natural boundaries (functions, classes, etc.) for better search results.
 
@@ -49,32 +93,9 @@ make install BIN_DIR=/usr/local/bin  # or any directory in your PATH
 
 If you don't have Go installed, see [INSTALL.md](INSTALL.md) for instructions on using pre-built binaries from [Releases](https://github.com/mazziv/giddyanne/releases).
 
-## Quick Start
-
-```bash
-cd /path/to/your/project
-
-# Initialize - creates a prompt to help you write .giddyanne.yaml
-giddy init
-
-# If you use Claude or another CLI LLM tool, you can do
-claude "Follow these instructions and create the file as described here $(giddy init)"
-
-# Start the server (runs in background)
-giddy up
-
-# Search your codebase
-giddy find "authentication logic"
-giddy find "database connection handling"
-
-# Check status
-giddy status
-
-# Stop when done
-giddy down
-```
-
 ## CLI Reference
+
+Run `giddy help`
 
 | Command | Description |
 |---------|-------------|
