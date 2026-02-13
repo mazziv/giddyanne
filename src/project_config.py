@@ -1,6 +1,8 @@
 """Project configuration loader for .giddyanne.yaml files."""
 
+import hashlib
 import logging
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -257,6 +259,13 @@ class ProjectConfig:
         )
 
         return cls(paths=paths, settings=settings)
+
+    @staticmethod
+    def get_tmp_storage_dir(root_path: Path) -> Path:
+        """Get deterministic tmp storage dir for a project root."""
+        root_str = str(root_path.resolve())
+        short_hash = hashlib.sha256(root_str.encode()).hexdigest()[:8]
+        return Path(tempfile.gettempdir()) / "giddyanne" / f"{root_path.name}-{short_hash}"
 
     @classmethod
     def default(cls, root_path: Path) -> "ProjectConfig":

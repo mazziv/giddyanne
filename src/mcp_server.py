@@ -1,6 +1,7 @@
 """MCP server for semantic codebase search."""
 
 import time
+from importlib.metadata import version as pkg_version
 from typing import TYPE_CHECKING
 
 from mcp.server import Server
@@ -11,7 +12,7 @@ from .embeddings import EmbeddingService
 from .vectorstore import VectorStore
 
 if TYPE_CHECKING:
-    from mcp_main import StatsTracker
+    from .engine import StatsTracker
 
 # Will be initialized on startup
 _embedding_service: EmbeddingService | None = None
@@ -26,6 +27,14 @@ def create_server() -> Server:
     @server.list_tools()
     async def list_tools() -> list[Tool]:
         return [
+            Tool(
+                name="version",
+                description="Return the giddyanne version.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {},
+                },
+            ),
             Tool(
                 name="search",
                 description="Search the codebase by semantic similarity. "
@@ -58,6 +67,9 @@ def create_server() -> Server:
     async def call_tool(
         name: str, arguments: dict
     ) -> list[TextContent] | CallToolResult:
+        if name == "version":
+            return [TextContent(type="text", text=pkg_version("giddyanne"))]
+
         if name != "search":
             return CallToolResult(
                 content=[TextContent(type="text", text=f"Unknown tool: {name}")],

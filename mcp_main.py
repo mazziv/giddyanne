@@ -3,21 +3,12 @@
 import asyncio
 import logging
 import os
-import signal
 import sys
 from pathlib import Path
 
-from src.embeddings import EmbeddingService
-from src.engine import (
-    FileIndexer,
-    IndexingProgress,
-    StatsTracker,
-    create_embedding_provider,
-)
 from src.mcp_server import run_mcp_server
-from src.project_config import ConfigError, FileFilter, ProjectConfig
-from src.vectorstore import VectorStore
-from src.watcher import FileWatcher
+from src.project_config import ConfigError, ProjectConfig
+from src.startup import create_components, run_indexing, setup_signal_handlers, start_watcher
 
 logging.basicConfig(level=logging.WARNING)  # Quiet for MCP stdio
 logger = logging.getLogger(__name__)
@@ -30,76 +21,32 @@ async def main():
     root_path = Path(root_path_str).resolve() if root_path_str else Path.cwd().resolve()
     config_path = root_path / ".giddyanne.yaml"
 
-    # Load project config
+    # Load project config and determine storage dir
     if config_path.exists():
         project_config = ProjectConfig.load(config_path)
+        storage_dir = root_path / ".giddyanne"
     else:
         project_config = ProjectConfig.default(root_path)
+        storage_dir = ProjectConfig.get_tmp_storage_dir(root_path)
 
-    # Initialize embedding provider
-    provider = create_embedding_provider(project_config)
-    embedding_service = EmbeddingService(provider)
+    # Initialize all components
+    c = await create_components(root_path, project_config, storage_dir, log_filename="mcp.log")
 
     # Test embedding provider before indexing
     try:
-        await provider.embed("test")
+        await c.provider.embed("test")
     except Exception as e:
         print(f"Warning: Embedding provider failed: {e}", file=sys.stderr)
 
-    # Initialize stats tracker and progress
-    # db_path includes model name for isolation between different embedding models
-    safe_model = provider.model_name.replace("/", "-")
-    base_path = Path(project_config.settings.db_path)
-    db_path = root_path / base_path.parent / safe_model / base_path.name
-    log_path = db_path.parent / "mcp.log"
-    stats = StatsTracker(log_path, root_path)
-    progress = IndexingProgress()
+    # Index synchronously (MCP needs index ready before serving)
+    await run_indexing(c)
+    watcher = await start_watcher(c)
 
-    # Initialize vector store
-    vector_store = VectorStore(db_path, provider.dimension())
-    await vector_store.connect()
-
-    # Create file filter (shared between indexer and watcher)
-    file_filter = FileFilter(root_path, project_config)
-
-    # Index files
-    indexer = FileIndexer(
-        embedding_service,
-        vector_store,
-        file_filter,
-        stats,
-        progress,
-    )
-
-    # Reconcile index first (remove stale files)
-    removed = await indexer.reconcile_index()
-    if removed:
-        logger.info(f"Removed {removed} stale files from index")
-
-    await indexer.full_index()
-
-    # Start file watcher for real-time updates
-    watcher = FileWatcher(file_filter, indexer.handle_event)
-    await watcher.start()
-
-    # Run MCP server
-    await run_mcp_server(embedding_service, vector_store, stats)
+    await run_mcp_server(c.embedding_service, c.vector_store, c.stats)
 
 
 if __name__ == "__main__":
-    # Become process group leader so we can kill all child processes on exit
-    # (sentence-transformers/PyTorch spawn workers that need to be cleaned up)
-    try:
-        os.setpgrp()
-    except OSError:
-        pass  # Already a process group leader
-
-    def handle_signal(signum, frame):
-        # Kill entire process group to clean up embedding model workers
-        os.killpg(os.getpid(), signal.SIGKILL)
-
-    signal.signal(signal.SIGTERM, handle_signal)
-    signal.signal(signal.SIGINT, handle_signal)
+    setup_signal_handlers()
 
     try:
         asyncio.run(main())

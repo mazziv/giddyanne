@@ -1,6 +1,20 @@
 # Configuration
 
-Giddyanne requires a `.giddyanne.yaml` file in your project root.
+Giddyanne works in any git repo without configuration. A `.giddyanne.yaml` file is optional but recommended for better search quality.
+
+## Zero-Config Mode
+
+In a git repo without `.giddyanne.yaml`, giddyanne automatically:
+- Uses the git root as the project root
+- Indexes common directories (`src/`, `lib/`, `app/`, `tests/`, `docs/`) or the whole project if none exist
+- Respects `.gitignore` patterns
+- Stores indexes in the system temp directory (`$TMPDIR/giddyanne/<name>-<hash>/`)
+
+Indexes rebuild automatically if the temp directory gets cleaned. This is fine — `giddy up` is fast.
+
+## Config File
+
+For better search quality, add a `.giddyanne.yaml` to your project root. Path descriptions are embedded alongside content, improving semantic matching.
 
 ## Minimal Config
 
@@ -126,9 +140,11 @@ Defaults work well for most codebases. Smaller chunks give more precise results 
 |---------|---------|-------------|
 | `local_model` | "all-MiniLM-L6-v2" | Sentence-transformers model name |
 
-The database is stored at `.giddyanne/<model-name>/vectors.lance`. Each model gets its own index, so you can switch models without losing data.
+With a config file, the database is stored at `.giddyanne/<model-name>/vectors.lance`. In zero-config mode, it's stored in the system temp directory. Each model gets its own index, so you can switch models without losing data.
 
 Available models:
 - `all-MiniLM-L6-v2` (default) - Good balance of speed and quality
 - `all-mpnet-base-v2` - Higher quality, slower
 - `paraphrase-MiniLM-L3-v2` - Faster, lower quality
+
+[← Back to README.md](README.md)

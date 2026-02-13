@@ -1,6 +1,7 @@
 .PHONY: all go python vscode install clean
 
 BIN_DIR := $(HOME)/bin
+VERSION := $(shell grep '^version' pyproject.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
 GO_SOURCES := $(shell find cmd -name '*.go') go.mod
 VSCODE_SOURCES := $(shell find vscode/src -name '*.ts') vscode/package.json
 
@@ -9,7 +10,7 @@ all: giddy .venv/.installed
 go: giddy
 
 giddy: $(GO_SOURCES)
-	go build -o giddy ./cmd/giddy
+	go build -ldflags "-X main.Version=$(VERSION)" -o giddy ./cmd/giddy
 
 python: .venv/.installed
 
@@ -28,17 +29,17 @@ install: all
 	@echo ""
 	@echo "Make sure $(BIN_DIR) is in your PATH, then run 'giddy init' in any project."
 
-vscode: vscode/giddyanne-1.1.1.vsix
+vscode: vscode/giddyanne-$(VERSION).vsix
 
 vscode/node_modules: vscode/package.json
 	cd vscode && npm install --silent
 	@touch $@
 
-vscode/giddyanne-1.1.1.vsix: vscode/node_modules $(VSCODE_SOURCES)
-	cd vscode && npm run compile --silent && npx @vscode/vsce package -o giddyanne-1.1.1.vsix
+vscode/giddyanne-$(VERSION).vsix: vscode/node_modules $(VSCODE_SOURCES)
+	cd vscode && npm run compile --silent && npx @vscode/vsce package -o giddyanne-$(VERSION).vsix
 	@echo ""
-	@echo "Built vscode/giddyanne-1.1.1.vsix"
-	@echo "Install with: code --install-extension vscode/giddyanne-1.1.1.vsix"
+	@echo "Built vscode/giddyanne-$(VERSION).vsix"
+	@echo "Install with: code --install-extension vscode/giddyanne-$(VERSION).vsix"
 
 clean:
 	rm -f giddy .venv/.installed vscode/giddyanne-*.vsix

@@ -9,12 +9,14 @@
 3. **Check paths**: Does your config include the directory you're searching?
 4. **Try hybrid search**: If using `--semantic` or `--full-text`, try without flags
 
-### "Config file not found"
+### "No .giddyanne.yaml or git repository found"
 
-You need a `.giddyanne.yaml` in your project root:
+Giddyanne needs either a `.giddyanne.yaml` config file or a `.git/` directory in the current directory or any parent.
+
+If you're in a git repo, this should work automatically. Otherwise:
 
 ```bash
-giddy init          # Shows a prompt to help you create one
+giddy init          # Shows a prompt to help you create a config
 ```
 
 Or create a minimal config:
@@ -64,15 +66,20 @@ The embedding model uses ~500MB RAM. If this is a problem:
 ### Emacs/VSCode not connecting
 
 1. Ensure the server is running: `giddy status`
-2. Check you're in a directory with `.giddyanne.yaml`
+2. Check you're in a git repo or a directory with `.giddyanne.yaml`
 3. For MCP: verify `giddy mcp` works from command line
 
 ## Internal Files
 
-All runtime files live in `.giddyanne/` in your project root:
+Runtime files live in a storage directory. The location depends on mode:
+
+| Mode | Storage directory |
+|------|-------------------|
+| **Config mode** (`.giddyanne.yaml` found) | `.giddyanne/` in the project root |
+| **Git-only mode** (no config) | `$TMPDIR/giddyanne/<project>-<hash>/` |
 
 ```
-.giddyanne/
+<storage-dir>/
 ├── all-MiniLM-L6-v2/     # Named after your embedding model
 │   ├── vectors.lance/    # Vector database (LanceDB)
 │   └── mcp.log           # MCP server log
@@ -80,37 +87,28 @@ All runtime files live in `.giddyanne/` in your project root:
 └── -8000.pid             # Server PID file (host-port.pid)
 ```
 
+In git-only mode, the tmp path is deterministic — the same project always gets the same path. Indexes rebuild if the temp directory gets cleaned.
+
 ### Log Files
 
-**HTTP server log** (`.giddyanne/<host>-<port>.log`):
+**HTTP server log** (`<storage-dir>/<host>-<port>.log`):
 ```bash
-cat .giddyanne/-8000.log  # View directly
-giddy log                  # Or stream live
+giddy log                  # Stream live (finds the right location automatically)
 ```
 
 Contains indexing progress, file watch events, and search requests.
 
-**MCP server log** (`.giddyanne/<model>/mcp.log`):
-```bash
-cat .giddyanne/all-MiniLM-L6-v2/mcp.log
-```
+**MCP server log** (`<storage-dir>/<model>/mcp.log`):
 
 Contains MCP protocol messages and search requests from Claude Code.
 
 ### PID Files
 
-The `.pid` file tracks the running server process:
+The `.pid` file tracks the running server process. If `giddy status` says the server is running but it's not responding, the PID file may be stale:
 
 ```bash
-cat .giddyanne/-8000.pid           # Shows PID
-ps -p $(cat .giddyanne/-8000.pid)  # Verify process exists
-```
-
-If `giddy status` says the server is running but it's not responding, the PID file may be stale:
-
-```bash
-rm .giddyanne/-8000.pid
-giddy up
+giddy clean --force   # Remove all storage data
+giddy up              # Restart fresh
 ```
 
 ### Database Files
@@ -127,3 +125,5 @@ giddy drop
 giddy clean        # prompts for confirmation
 giddy clean --force  # no confirmation
 ```
+
+[← Back to README.md](README.md)

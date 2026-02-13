@@ -10,7 +10,7 @@
 ## Build from Source
 
 ```bash
-git clone --depth 1 --branch v1.1.1 https://github.com/mazziv/giddyanne.git
+git clone --depth 1 --branch v1.2.0 https://github.com/mazziv/giddyanne.git
 cd giddyanne
 make install
 ```
@@ -29,12 +29,12 @@ If you don't have Go installed:
 
 ```bash
 # Clone the repo (needed for Python server code)
-git clone --depth 1 --branch v1.1.1 https://github.com/mazziv/giddyanne.git
+git clone --depth 1 --branch v1.2.0 https://github.com/mazziv/giddyanne.git
 cd giddyanne
 
 # Download binary for your platform from Releases:
 # https://github.com/mazziv/giddyanne/releases
-# Move it into the repo root (same directory as main.py)
+# Move it into the repo root (same directory as http_main.py)
 
 # On macOS, clear the quarantine flag
 xattr -d com.apple.quarantine giddy
@@ -76,3 +76,5 @@ rm -rf /path/to/giddyanne
 # Optional: remove cached models
 rm -rf ~/.cache/huggingface/hub/models--sentence-transformers--all-MiniLM-L6-v2
 ```
+
+[← Back to README.md](README.md)

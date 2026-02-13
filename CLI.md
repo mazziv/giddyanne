@@ -14,7 +14,7 @@ Run `giddy help` for built-in help.
 | `giddy health` | Show index statistics (files, chunks, size) |
 | `giddy log` | Stream server logs in real-time |
 | `giddy drop` | Remove search index (keeps logs) |
-| `giddy clean` | Remove all .giddyanne data (with confirmation) |
+| `giddy clean` | Remove all giddyanne data (with confirmation) |
 | `giddy init` | Generate a config file prompt |
 | `giddy mcp` | Run MCP server (for Claude Code) |
 
@@ -78,3 +78,5 @@ giddy completion fish | source
 ```
 
 ![Shell completions](img/autocomplete.png)
+
+[← Back to README.md](README.md)

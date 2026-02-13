@@ -4,6 +4,15 @@ All notable changes to giddyanne will be documented in this file.
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-02-12
+
+### Added
+
+- **`--version` / `-V` flag** for CLI (`giddy --version` prints `giddy 1.2.0`)
+- **MCP `version` tool** returns the installed giddyanne version
+- **Single version source of truth**: `pyproject.toml` drives all version strings — Go CLI reads it at build time via ldflags, Python reads via `importlib.metadata`
+- **Zero-config git repo support**: `giddy` now works in any git repo without a `.giddyanne.yaml` config file. Auto-detects common source directories (`src/`, `lib/`, `app/`, `tests/`, `docs/`) and stores indexes in the system temp directory. Config file still takes priority when present.
+
 ## [1.1.1] - 2025-12-31
 
 Installation improvements.

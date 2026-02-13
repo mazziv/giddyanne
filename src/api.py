@@ -1,6 +1,7 @@
 """FastAPI HTTP server for querying file embeddings."""
 
 import time
+from importlib.metadata import version
 from typing import Literal
 
 from fastapi import FastAPI, HTTPException
@@ -60,7 +61,7 @@ def create_app(
     app = FastAPI(
         title="Giddyanne",
         description="Semantic file search via embeddings",
-        version="0.1.0",
+        version=version("giddyanne"),
     )
 
     @app.get("/health")
@@ -151,7 +152,7 @@ def create_app(
     @app.post("/reindex")
     async def reindex():
         """Trigger a full reindex (placeholder)."""
-        # This will be implemented in main.py with access to the indexer
+        # This will be implemented in http_main.py with access to the indexer
         return {"status": "reindex triggered"}
 
     return app

@@ -15,7 +15,7 @@ Add to your project's `.mcp.json` (or global `~/.claude/config.json`):
 }
 ```
 
-The `giddy mcp` command finds the project root by walking up to `.giddyanne.yaml`.
+The `giddy mcp` command finds the project root by walking up to `.giddyanne.yaml`, or falls back to the nearest `.git/` directory.
 
 ## Emacs
 
@@ -90,7 +90,7 @@ Requires Node.js 18+ and npm.
 ```bash
 cd giddyanne
 make vscode
-code --install-extension vscode/giddyanne-1.1.1.vsix
+code --install-extension vscode/giddyanne-1.2.0.vsix
 ```
 
 ### Commands
@@ -134,3 +134,5 @@ curl http://localhost:8000/health
 | `/status` | GET | Indexing progress and server state |
 | `/stats` | GET | Index statistics (files, chunks, size) |
 | `/health` | GET | Liveness check |
+
+[← Back to README.md](README.md)

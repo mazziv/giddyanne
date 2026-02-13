@@ -2,6 +2,7 @@
 package main
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,8 +17,10 @@ import (
 	"time"
 )
 
+// Version is set at build time via ldflags.
+var Version = "dev"
+
 const (
-	pidDir       = ".giddyanne"
 	pollInterval = 500 * time.Millisecond
 	defaultHost  = "0.0.0.0"
 	defaultPort  = 8000
@@ -98,9 +101,13 @@ func main() {
 
 	input := os.Args[1]
 
-	// Handle help flags directly
+	// Handle flags directly
 	if input == "--help" || input == "-h" {
 		printUsage()
+		return
+	}
+	if input == "--version" || input == "-V" {
+		fmt.Printf("giddy %s\n", Version)
 		return
 	}
 
@@ -189,12 +196,12 @@ Clean options:
   --force        Skip confirmation prompt`)
 }
 
-var errNoConfig = errors.New("no config found")
+var errNoProject = errors.New("no project found")
 
-func printNoConfigHelp() {
-	fmt.Fprintln(os.Stderr, `No .giddyanne.yaml found in current directory or parents.
+func printNoProjectHelp() {
+	fmt.Fprintln(os.Stderr, `No .giddyanne.yaml or git repository found.
 
-To create one:
+Run inside a git repo, or create a config:
 
   giddy init    # Generates an LLM prompt to create config
 
@@ -205,29 +212,65 @@ Or manually create .giddyanne.yaml:
       description: Source code`)
 }
 
-func findProjectRoot() (string, error) {
+// findProjectRoot returns (root, hasConfig, err).
+// First pass: walk up looking for .giddyanne.yaml (config mode).
+// Second pass: walk up looking for .git/ (git-only mode).
+func findProjectRoot() (string, bool, error) {
 	dir, err := os.Getwd()
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 
+	// First pass: look for .giddyanne.yaml
+	d := dir
 	for {
-		configPath := filepath.Join(dir, ".giddyanne.yaml")
+		configPath := filepath.Join(d, ".giddyanne.yaml")
 		if _, err := os.Stat(configPath); err == nil {
-			return dir, nil
+			return d, true, nil
 		}
-
-		parent := filepath.Dir(dir)
-		if parent == dir {
+		parent := filepath.Dir(d)
+		if parent == d {
 			break
 		}
-		dir = parent
+		d = parent
 	}
 
-	return "", errNoConfig
+	// Second pass: look for .git (file or directory)
+	d = dir
+	for {
+		gitPath := filepath.Join(d, ".git")
+		if _, err := os.Stat(gitPath); err == nil {
+			return d, false, nil
+		}
+		parent := filepath.Dir(d)
+		if parent == d {
+			break
+		}
+		d = parent
+	}
+
+	return "", false, errNoProject
 }
 
-func getPIDFilePath(root, host string, port int) string {
+// getTmpStorageDir computes a deterministic tmp storage dir matching the Python implementation.
+func getTmpStorageDir(root string) string {
+	absRoot, err := filepath.Abs(root)
+	if err != nil {
+		absRoot = root
+	}
+	hash := fmt.Sprintf("%x", sha256.Sum256([]byte(absRoot)))[:8]
+	return filepath.Join(os.TempDir(), "giddyanne", filepath.Base(root)+"-"+hash)
+}
+
+// getStorageDir returns the storage directory based on mode.
+func getStorageDir(root string, hasConfig bool) string {
+	if hasConfig {
+		return filepath.Join(root, ".giddyanne")
+	}
+	return getTmpStorageDir(root)
+}
+
+func getPIDFilePath(storageDir, host string, port int) string {
 	// Use same naming convention as Python (omit defaults)
 	hostPart := host
 	if host == defaultHost {
@@ -237,12 +280,12 @@ func getPIDFilePath(root, host string, port int) string {
 	if port != defaultPort {
 		portPart = strconv.Itoa(port)
 	}
-	return filepath.Join(root, pidDir, fmt.Sprintf("%s-%s.pid", hostPart, portPart))
+	return filepath.Join(storageDir, fmt.Sprintf("%s-%s.pid", hostPart, portPart))
 }
 
 // findRunningServer scans pid files and returns (host, port, pid) or ("", 0, 0) if not running.
-func findRunningServer(root string) (string, int, int) {
-	dir := filepath.Join(root, pidDir)
+func findRunningServer(storageDir string) (string, int, int) {
+	dir := storageDir
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return "", 0, 0
@@ -342,7 +385,7 @@ func getGiddyDir() (string, error) {
 	return dir, nil
 }
 
-func startServer(root string, verbose bool, portOverride int, hostOverride string) (int, error) {
+func startServer(root, storageDir string, verbose bool, portOverride int, hostOverride string) (int, error) {
 	// Find giddy installation directory
 	giddyDir, err := getGiddyDir()
 	if err != nil {
@@ -355,9 +398,9 @@ func startServer(root string, verbose bool, portOverride int, hostOverride strin
 		return 0, fmt.Errorf("python venv not found at %s (run install first)", pythonPath)
 	}
 
-	mainPath := filepath.Join(giddyDir, "main.py")
+	mainPath := filepath.Join(giddyDir, "http_main.py")
 	if _, err := os.Stat(mainPath); err != nil {
-		return 0, fmt.Errorf("main.py not found at %s", mainPath)
+		return 0, fmt.Errorf("http_main.py not found at %s", mainPath)
 	}
 
 	// Build command arguments
@@ -389,7 +432,7 @@ func startServer(root string, verbose bool, portOverride int, hostOverride strin
 	// Poll for daemon health
 	for {
 		time.Sleep(pollInterval)
-		if _, port, pid := findRunningServer(root); pid != 0 {
+		if _, port, pid := findRunningServer(storageDir); pid != 0 {
 			if isServerHealthy(port) {
 				return port, nil
 			}
@@ -397,13 +440,13 @@ func startServer(root string, verbose bool, portOverride int, hostOverride strin
 	}
 }
 
-func ensureServer(root string) (int, error) {
-	if _, port, pid := findRunningServer(root); pid != 0 {
+func ensureServer(root, storageDir string) (int, error) {
+	if _, port, pid := findRunningServer(storageDir); pid != 0 {
 		if isServerHealthy(port) {
 			return port, nil
 		}
 	}
-	return startServer(root, false, 0, "")
+	return startServer(root, storageDir, false, 0, "")
 }
 
 func runSearch(args []string) {
@@ -463,17 +506,18 @@ func runSearch(args []string) {
 		os.Exit(1)
 	}
 
-	root, err := findProjectRoot()
+	root, hasConfig, err := findProjectRoot()
 	if err != nil {
-		if errors.Is(err, errNoConfig) {
-			printNoConfigHelp()
+		if errors.Is(err, errNoProject) {
+			printNoProjectHelp()
 		} else {
 			fmt.Fprintf(os.Stderr, "Error finding project root: %v\n", err)
 		}
 		os.Exit(1)
 	}
+	storageDir := getStorageDir(root, hasConfig)
 
-	port, err := ensureServer(root)
+	port, err := ensureServer(root, storageDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error starting server: %v\n", err)
 		os.Exit(1)
@@ -618,23 +662,24 @@ func runStart(args []string) {
 		}
 	}
 
-	root, err := findProjectRoot()
+	root, hasConfig, err := findProjectRoot()
 	if err != nil {
-		if errors.Is(err, errNoConfig) {
-			printNoConfigHelp()
+		if errors.Is(err, errNoProject) {
+			printNoProjectHelp()
 		} else {
 			fmt.Fprintf(os.Stderr, "Error finding project root: %v\n", err)
 		}
 		os.Exit(1)
 	}
+	storageDir := getStorageDir(root, hasConfig)
 
-	if host, port, pid := findRunningServer(root); pid != 0 {
+	if host, port, pid := findRunningServer(storageDir); pid != 0 {
 		fmt.Printf("Server already running (PID %d, %s:%d)\n", pid, host, port)
 		return
 	}
 
 	fmt.Println("Starting server...")
-	port, err := startServer(root, verbose, portOverride, hostOverride)
+	port, err := startServer(root, storageDir, verbose, portOverride, hostOverride)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
@@ -643,17 +688,18 @@ func runStart(args []string) {
 }
 
 func runStop() {
-	root, err := findProjectRoot()
+	root, hasConfig, err := findProjectRoot()
 	if err != nil {
-		if errors.Is(err, errNoConfig) {
-			printNoConfigHelp()
+		if errors.Is(err, errNoProject) {
+			printNoProjectHelp()
 		} else {
 			fmt.Fprintf(os.Stderr, "Error finding project root: %v\n", err)
 		}
 		os.Exit(1)
 	}
+	storageDir := getStorageDir(root, hasConfig)
 
-	host, port, pid := findRunningServer(root)
+	host, port, pid := findRunningServer(storageDir)
 	if pid == 0 {
 		fmt.Println("Server not running")
 		return
@@ -678,7 +724,7 @@ func runStop() {
 		}
 	}
 
-	os.Remove(getPIDFilePath(root, host, port))
+	os.Remove(getPIDFilePath(storageDir, host, port))
 	fmt.Println("Server stopped")
 }
 
@@ -719,18 +765,19 @@ func runBounce(args []string) {
 		}
 	}
 
-	root, err := findProjectRoot()
+	root, hasConfig, err := findProjectRoot()
 	if err != nil {
-		if errors.Is(err, errNoConfig) {
-			printNoConfigHelp()
+		if errors.Is(err, errNoProject) {
+			printNoProjectHelp()
 		} else {
 			fmt.Fprintf(os.Stderr, "Error finding project root: %v\n", err)
 		}
 		os.Exit(1)
 	}
+	storageDir := getStorageDir(root, hasConfig)
 
 	// Stop server if running
-	if host, port, pid := findRunningServer(root); pid != 0 {
+	if host, port, pid := findRunningServer(storageDir); pid != 0 {
 		fmt.Println("Stopping server...")
 		process, err := os.FindProcess(pid)
 		if err == nil {
@@ -742,13 +789,13 @@ func runBounce(args []string) {
 					break
 				}
 			}
-			os.Remove(getPIDFilePath(root, host, port))
+			os.Remove(getPIDFilePath(storageDir, host, port))
 		}
 	}
 
 	// Start server
 	fmt.Println("Starting server...")
-	port, err := startServer(root, verbose, portOverride, hostOverride)
+	port, err := startServer(root, storageDir, verbose, portOverride, hostOverride)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
@@ -757,17 +804,18 @@ func runBounce(args []string) {
 }
 
 func runStatus() {
-	root, err := findProjectRoot()
+	root, hasConfig, err := findProjectRoot()
 	if err != nil {
-		if errors.Is(err, errNoConfig) {
-			printNoConfigHelp()
+		if errors.Is(err, errNoProject) {
+			printNoProjectHelp()
 		} else {
 			fmt.Fprintf(os.Stderr, "Error finding project root: %v\n", err)
 		}
 		os.Exit(1)
 	}
+	storageDir := getStorageDir(root, hasConfig)
 
-	host, port, pid := findRunningServer(root)
+	host, port, pid := findRunningServer(storageDir)
 	if pid == 0 {
 		fmt.Println("Not running")
 		os.Exit(1)
@@ -821,17 +869,18 @@ func runStats(args []string) {
 		}
 	}
 
-	root, err := findProjectRoot()
+	root, hasConfig, err := findProjectRoot()
 	if err != nil {
-		if errors.Is(err, errNoConfig) {
-			printNoConfigHelp()
+		if errors.Is(err, errNoProject) {
+			printNoProjectHelp()
 		} else {
 			fmt.Fprintf(os.Stderr, "Error finding project root: %v\n", err)
 		}
 		os.Exit(1)
 	}
+	storageDir := getStorageDir(root, hasConfig)
 
-	host, port, pid := findRunningServer(root)
+	host, port, pid := findRunningServer(storageDir)
 	if pid == 0 {
 		fmt.Fprintln(os.Stderr, "Server not running (use 'giddy up' first)")
 		os.Exit(1)
@@ -905,17 +954,18 @@ func formatBytes(bytes int64) string {
 }
 
 func runMonitor() {
-	root, err := findProjectRoot()
+	root, hasConfig, err := findProjectRoot()
 	if err != nil {
-		if errors.Is(err, errNoConfig) {
-			printNoConfigHelp()
+		if errors.Is(err, errNoProject) {
+			printNoProjectHelp()
 		} else {
 			fmt.Fprintf(os.Stderr, "Error finding project root: %v\n", err)
 		}
 		os.Exit(1)
 	}
+	storageDir := getStorageDir(root, hasConfig)
 
-	host, port, pid := findRunningServer(root)
+	host, port, pid := findRunningServer(storageDir)
 	if pid == 0 {
 		fmt.Fprintln(os.Stderr, "Server not running (use 'giddy up' first)")
 		os.Exit(1)
@@ -930,7 +980,7 @@ func runMonitor() {
 	if port != defaultPort {
 		portPart = strconv.Itoa(port)
 	}
-	logPath := filepath.Join(root, ".giddyanne", fmt.Sprintf("%s-%s.log", hostPart, portPart))
+	logPath := filepath.Join(storageDir, fmt.Sprintf("%s-%s.log", hostPart, portPart))
 	if _, err := os.Stat(logPath); os.IsNotExist(err) {
 		fmt.Fprintf(os.Stderr, "Log file not found: %s\n", logPath)
 		os.Exit(1)
@@ -974,7 +1024,7 @@ func runMonitor() {
 		}
 
 		// Check if server is still running
-		if _, _, p := findRunningServer(root); p == 0 {
+		if _, _, p := findRunningServer(storageDir); p == 0 {
 			fmt.Println("\nServer stopped")
 			return
 		}
@@ -984,27 +1034,27 @@ func runMonitor() {
 }
 
 func runDrop() {
-	root, err := findProjectRoot()
+	root, hasConfig, err := findProjectRoot()
 	if err != nil {
-		if errors.Is(err, errNoConfig) {
-			printNoConfigHelp()
+		if errors.Is(err, errNoProject) {
+			printNoProjectHelp()
 		} else {
 			fmt.Fprintf(os.Stderr, "Error finding project root: %v\n", err)
 		}
 		os.Exit(1)
 	}
+	storageDir := getStorageDir(root, hasConfig)
 
 	// Warn if server is running (don't stop it)
-	_, _, pid := findRunningServer(root)
+	_, _, pid := findRunningServer(storageDir)
 	if pid != 0 {
 		fmt.Println("Note: Server is running. Index will rebuild on restart.")
 	}
 
-	giddyanneDir := filepath.Join(root, ".giddyanne")
 	removed := 0
 
 	// Remove legacy vectors.lance (old location)
-	legacyPath := filepath.Join(giddyanneDir, "vectors.lance")
+	legacyPath := filepath.Join(storageDir, "vectors.lance")
 	if _, err := os.Stat(legacyPath); err == nil {
 		if err := os.RemoveAll(legacyPath); err != nil {
 			fmt.Fprintf(os.Stderr, "Error removing legacy index: %v\n", err)
@@ -1015,10 +1065,10 @@ func runDrop() {
 	}
 
 	// Find and remove model-specific index directories
-	entries, err := os.ReadDir(giddyanneDir)
+	entries, err := os.ReadDir(storageDir)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			fmt.Fprintf(os.Stderr, "Error reading .giddyanne directory: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error reading storage directory: %v\n", err)
 		}
 		if removed == 0 {
 			fmt.Println("No index found.")
@@ -1031,7 +1081,7 @@ func runDrop() {
 			continue
 		}
 		// Check if this directory contains vectors.lance
-		vectorsPath := filepath.Join(giddyanneDir, entry.Name(), "vectors.lance")
+		vectorsPath := filepath.Join(storageDir, entry.Name(), "vectors.lance")
 		if _, err := os.Stat(vectorsPath); err == nil {
 			if err := os.RemoveAll(vectorsPath); err != nil {
 				fmt.Fprintf(os.Stderr, "Error removing %s: %v\n", entry.Name(), err)
@@ -1061,27 +1111,26 @@ func runClean(args []string) {
 		}
 	}
 
-	root, err := findProjectRoot()
+	root, hasConfig, err := findProjectRoot()
 	if err != nil {
-		if errors.Is(err, errNoConfig) {
-			printNoConfigHelp()
+		if errors.Is(err, errNoProject) {
+			printNoProjectHelp()
 		} else {
 			fmt.Fprintf(os.Stderr, "Error finding project root: %v\n", err)
 		}
 		os.Exit(1)
 	}
-
-	giddyanneDir := filepath.Join(root, ".giddyanne")
+	storageDir := getStorageDir(root, hasConfig)
 
 	// Check if directory exists
-	if _, err := os.Stat(giddyanneDir); os.IsNotExist(err) {
-		fmt.Println("Nothing to clean (.giddyanne not found).")
+	if _, err := os.Stat(storageDir); os.IsNotExist(err) {
+		fmt.Println("Nothing to clean (storage directory not found).")
 		return
 	}
 
 	// Require confirmation unless --force
 	if !force {
-		fmt.Print("Remove all giddyanne data (index, logs, everything)? [y/N] ")
+		fmt.Printf("Remove all giddyanne data in %s? [y/N] ", storageDir)
 		var response string
 		fmt.Scanln(&response)
 		if response != "y" && response != "Y" {
@@ -1091,19 +1140,19 @@ func runClean(args []string) {
 	}
 
 	// Stop server if running
-	_, _, pid := findRunningServer(root)
+	_, _, pid := findRunningServer(storageDir)
 	if pid != 0 {
 		fmt.Println("Stopping server...")
 		runStop()
 	}
 
-	// Remove entire .giddyanne directory
-	if err := os.RemoveAll(giddyanneDir); err != nil {
-		fmt.Fprintf(os.Stderr, "Error removing .giddyanne: %v\n", err)
+	// Remove storage directory
+	if err := os.RemoveAll(storageDir); err != nil {
+		fmt.Fprintf(os.Stderr, "Error removing storage directory: %v\n", err)
 		os.Exit(1)
 	}
 
-	fmt.Println("Removed .giddyanne directory.")
+	fmt.Printf("Removed %s\n", storageDir)
 }
 
 func runInit() {
@@ -1172,17 +1221,17 @@ func runMcp() {
 	}
 
 	// Find project root for working directory
-	root, err := findProjectRoot()
+	root, _, err := findProjectRoot()
 	if err != nil {
-		if errors.Is(err, errNoConfig) {
-			printNoConfigHelp()
+		if errors.Is(err, errNoProject) {
+			printNoProjectHelp()
 		} else {
 			fmt.Fprintf(os.Stderr, "Error finding project root: %v\n", err)
 		}
 		os.Exit(1)
 	}
 
-	// Run MCP server with stdio connected
+	// Run MCP server with stdio connected (Python determines storage_dir itself)
 	cmd := exec.Command(pythonPath, mcpMainPath)
 	cmd.Dir = root
 	cmd.Stdin = os.Stdin

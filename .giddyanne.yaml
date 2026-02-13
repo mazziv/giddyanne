@@ -14,11 +14,11 @@ paths:
   - path: vscode/
     description: VsCode package with full integration
 
-  - path: main.py
-    description: HTTP server entrypoint, wires components together
+  - path: http_main.py
+    description: HTTP server entrypoint — daemon management, CLI args, uvicorn
 
   - path: mcp_main.py
-    description: MCP server entrypoint for Claude integration
+    description: MCP server entrypoint — stdio transport for Claude integration
 
 settings:
   ignore_patterns: ["*.pyc"]

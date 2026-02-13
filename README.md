@@ -22,7 +22,7 @@ giddy find "authentication logic"
 
 **Integrated** - Works where you work. VSCode, Emacs, CLI, MCP for AI assistants, or HTTP API for custom workflows.
 
-**v1.1.1** · [Changelog](CHANGELOG.md)
+**v1.2.0** · [Changelog](CHANGELOG.md)
 
 ---
 
@@ -37,15 +37,17 @@ Unlike GitHub Copilot or cloud-based code search, everything runs locally. Unlik
 ## Quickstart
 
 ```bash
-git clone --depth 1 --branch v1.1.1 https://github.com/mazziv/giddyanne.git
+git clone --depth 1 --branch v1.2.0 https://github.com/mazziv/giddyanne.git
 cd giddyanne && make install
 ```
 
-Then in your project:
+Then in any git repo:
 
 ```bash
-# Start the search server
-giddy up
+# Search semantically (auto-starts server, no config needed)
+giddy find "error handling for API calls"
+> src/api/client.py:123-145 (0.76)
+>   def handle_request_error(response):
 
 # Check what's indexed
 giddy health
@@ -53,16 +55,11 @@ giddy health
 > Total chunks:  288
 > Index size:    3.85 MB
 
-# Search semantically
-giddy find "error handling for API calls"
-> src/api/client.py:123-145 (0.76)
->   def handle_request_error(response):
-
 # Stop the server
 giddy down
 ```
 
-Requires a `.giddyanne.yaml` config file in your project root. See [CONFIG.md](CONFIG.md) or run `giddy init` to generate one.
+Works out of the box in any git repo. For better results, add a `.giddyanne.yaml` config with path descriptions — see [CONFIG.md](CONFIG.md) or run `giddy init`.
 
 ## Real-World Examples
 
@@ -115,6 +112,7 @@ Files matching `.gitignore` patterns are automatically excluded.
 | [SEARCHING.md](SEARCHING.md) | How to write effective queries |
 | [INTEGRATIONS.md](INTEGRATIONS.md) | MCP, Emacs, VSCode, HTTP API |
 | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Common issues and solutions |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | How the internals work |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Development setup and help wanted |
 
 ## FAQ
