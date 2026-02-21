@@ -169,6 +169,19 @@ export async function health(): Promise<void> {
     }
 }
 
+export async function sitemap(): Promise<void> {
+    try {
+        const output = client.sitemap();
+
+        const channel = vscode.window.createOutputChannel('Giddyanne Sitemap');
+        channel.clear();
+        channel.appendLine(output);
+        channel.show();
+    } catch (error: any) {
+        vscode.window.showErrorMessage(`Giddyanne: ${error.message}`);
+    }
+}
+
 let logTerminal: vscode.Terminal | undefined;
 
 export function log(): void {

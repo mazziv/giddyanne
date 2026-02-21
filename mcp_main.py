@@ -40,7 +40,7 @@ async def main():
 
     # Index synchronously (MCP needs index ready before serving)
     await run_indexing(c)
-    watcher = await start_watcher(c)
+    await start_watcher(c)
 
     await run_mcp_server(c.embedding_service, c.vector_store, c.stats, project_config, root_path)
 

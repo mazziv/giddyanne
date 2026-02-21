@@ -9,6 +9,7 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.commands.registerCommand('giddyanne.down', commands.down),
         vscode.commands.registerCommand('giddyanne.status', commands.status),
         vscode.commands.registerCommand('giddyanne.health', commands.health),
+        vscode.commands.registerCommand('giddyanne.sitemap', commands.sitemap),
         vscode.commands.registerCommand('giddyanne.log', commands.log)
     );
 

@@ -3,7 +3,7 @@
 ;; Copyright (C) 2025 Joey
 
 ;; Author: Joey
-;; Version: 1.3.0
+;; Version: 1.3.1
 ;; Package-Requires: ((emacs "28.1"))
 ;; Keywords: tools, search, semantic
 ;; URL: https://github.com/mazziv/giddyanne
@@ -21,12 +21,13 @@
 ;;   giddyanne-down    - Stop the server
 ;;   giddyanne-status  - Show server status (one-line)
 ;;   giddyanne-health  - Show index statistics (multi-line)
+;;   giddyanne-sitemap - Show indexed files as tree
 ;;   giddyanne-log     - Toggle log buffer
 ;;
 ;; Setup for Doom Emacs:
 ;; (use-package giddyanne
 ;;   :load-path "~/projects/giddyanne/emacs"
-;;   :commands (giddyanne-find giddyanne-up giddyanne-down giddyanne-status giddyanne-log giddyanne-health)
+;;   :commands (giddyanne-find giddyanne-up giddyanne-down giddyanne-status giddyanne-log giddyanne-health giddyanne-sitemap)
 ;;   :init
 ;;   (map! :leader
 ;;         (:prefix "s"
@@ -305,6 +306,21 @@ Set to nil to use Vertico's default. The default removes dashes."
   (interactive)
   (let ((output (giddyanne--run "health")))
     (with-current-buffer (get-buffer-create "*Giddyanne Health*")
+      (let ((inhibit-read-only t))
+        (erase-buffer)
+        (insert (string-trim output)))
+      (goto-char (point-min))
+      (special-mode)
+      (when (bound-and-true-p evil-mode)
+        (evil-local-set-key 'normal (kbd "<escape>") #'quit-window))
+      (pop-to-buffer (current-buffer)))))
+
+;;;###autoload
+(defun giddyanne-sitemap ()
+  "Show giddyanne indexed files as a tree."
+  (interactive)
+  (let ((output (giddyanne--run "sitemap")))
+    (with-current-buffer (get-buffer-create "*Giddyanne Sitemap*")
       (let ((inhibit-read-only t))
         (erase-buffer)
         (insert (string-trim output)))

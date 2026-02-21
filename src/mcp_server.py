@@ -31,6 +31,8 @@ def _append_file_tree(
     tree: dict = {}
     for fp in sorted(file_paths):
         rel = fp[len(prefix):]
+        if not rel:
+            continue
         parts = rel.split("/")
         node = tree
         for i, part in enumerate(parts):

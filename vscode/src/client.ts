@@ -174,6 +174,10 @@ export class GiddyanneClient {
         return this.runCli('health');
     }
 
+    sitemap(): string {
+        return this.runCli('sitemap');
+    }
+
     isServerRunning(): boolean {
         return this.getServerUrl() !== undefined;
     }

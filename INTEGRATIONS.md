@@ -77,6 +77,7 @@ Or with `use-package`:
 | `giddyanne-down` | Stop server |
 | `giddyanne-status` | Show server status |
 | `giddyanne-health` | Show index stats |
+| `giddyanne-sitemap` | Show indexed files as tree |
 | `giddyanne-log` | Toggle log buffer |
 
 The package integrates with Vertico (showing results grouped by file) and nerd-icons (file type icons in results).
@@ -90,7 +91,7 @@ Requires Node.js 18+ and npm.
 ```bash
 cd giddyanne
 make vscode
-code --install-extension vscode/giddyanne-1.3.0.vsix
+code --install-extension vscode/giddyanne-1.3.1.vsix
 ```
 
 ### Commands
@@ -102,6 +103,7 @@ code --install-extension vscode/giddyanne-1.3.0.vsix
 | `Giddyanne: Stop Server` | | Stop server |
 | `Giddyanne: Server Status` | | Show server status |
 | `Giddyanne: Index Health` | | Show index stats |
+| `Giddyanne: Sitemap` | | Show indexed files as tree |
 | `Giddyanne: Stream Logs` | | Open terminal with live logs |
 
 ![VSCode integration](img/vscode.png)

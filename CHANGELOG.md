@@ -4,6 +4,18 @@ All notable changes to giddyanne will be documented in this file.
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-02-20
+
+### Added
+
+- **Sitemap command in Emacs and VSCode**: `giddyanne-sitemap` (Emacs) and `Giddyanne: Sitemap` (VSCode) show indexed files as a tree
+
+### Fixed
+
+- Fix empty tree node for standalone file path groups in MCP sitemap output
+- Fix unused variable warning in MCP server entrypoint
+- Fix `fmt.Println` redundant newline warning in Go CLI
+
 ## [1.3.0] - 2026-02-20
 
 ### Added

@@ -1413,14 +1413,14 @@ func runInit() {
 	files := gatherSourceFiles(cwd)
 
 	// Print the prompt
-	fmt.Println(`Copy and paste this prompt to an LLM to generate a config file:
+	fmt.Print(`Copy and paste this prompt to an LLM to generate a config file:
 
 ---
 
 Create a .giddyanne.yaml config file for my project. Here's the structure of my codebase:
 `)
 	fmt.Println(files)
-	fmt.Println(`
+	fmt.Print(`
 The config format is:
 
 ` + "```yaml" + `
