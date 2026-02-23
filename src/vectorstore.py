@@ -1,11 +1,17 @@
 """Vector store module using LanceDB."""
 
+from __future__ import annotations
+
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import lancedb
 import pyarrow as pa
+
+if TYPE_CHECKING:
+    from .reranker import Reranker
 
 
 class StorageError(Exception):
@@ -87,15 +93,112 @@ def _deduplicate_by_file(results: list[SearchResult]) -> list[SearchResult]:
     return sorted(best.values(), key=lambda x: x.score, reverse=True)
 
 
+def _rerank_results(
+    results: list[SearchResult],
+    query_text: str,
+    reranker: Reranker,
+) -> list[SearchResult]:
+    """Re-score results using a cross-encoder and sort by new scores."""
+    if not results:
+        return results
+
+    documents = [r.content for r in results]
+    scores = reranker.rerank(query_text, documents)
+
+    reranked = []
+    for r, new_score in zip(results, scores):
+        reranked.append(SearchResult(
+            path=r.path,
+            chunk_index=r.chunk_index,
+            start_line=r.start_line,
+            end_line=r.end_line,
+            content=r.content,
+            description=r.description,
+            score=new_score,
+            content_score=r.content_score,
+            description_score=r.description_score,
+        ))
+    reranked.sort(key=lambda x: x.score, reverse=True)
+    return reranked
+
+
+def _rrf_merge(
+    semantic_results: list[SearchResult],
+    fts_results: list[SearchResult],
+    semantic_weight: float = 1.0,
+    fts_weight: float = 1.0,
+    k: int = 60,
+) -> list[SearchResult]:
+    """Merge two ranked lists using weighted Reciprocal Rank Fusion.
+
+    For each result, computes:
+        score = w_sem / (k + rank_sem) + w_fts / (k + rank_fts)
+
+    Results are keyed by (path, chunk_index) so the same chunk from both
+    lists gets fused. Results appearing in only one list get a score
+    contribution from that list only.
+    """
+    # Build lookup: (path, chunk_index) -> (SearchResult, semantic_rank, fts_rank)
+    merged: dict[tuple[str, int], dict] = {}
+
+    for rank, r in enumerate(semantic_results, start=1):
+        key = (r.path, r.chunk_index)
+        merged[key] = {
+            "result": r,
+            "sem_rank": rank,
+            "fts_rank": None,
+            "content_score": r.content_score,
+            "description_score": r.description_score,
+        }
+
+    for rank, r in enumerate(fts_results, start=1):
+        key = (r.path, r.chunk_index)
+        if key in merged:
+            merged[key]["fts_rank"] = rank
+            # Keep description_score from semantic side (already set)
+        else:
+            merged[key] = {
+                "result": r,
+                "sem_rank": None,
+                "fts_rank": rank,
+                "content_score": r.content_score,
+                "description_score": r.description_score,
+            }
+
+    out = []
+    for key, entry in merged.items():
+        score = 0.0
+        if entry["sem_rank"] is not None:
+            score += semantic_weight / (k + entry["sem_rank"])
+        if entry["fts_rank"] is not None:
+            score += fts_weight / (k + entry["fts_rank"])
+
+        r = entry["result"]
+        out.append(SearchResult(
+            path=r.path,
+            chunk_index=r.chunk_index,
+            start_line=r.start_line,
+            end_line=r.end_line,
+            content=r.content,
+            description=r.description,
+            score=score,
+            content_score=entry["content_score"],
+            description_score=entry["description_score"],
+        ))
+
+    return out
+
+
 class VectorStore:
     """LanceDB-backed vector store for file embeddings."""
 
     TABLE_NAME = "files"
     SEARCH_CACHE_TABLE = "searches"
 
-    def __init__(self, db_path: Path, dimension: int):
+    def __init__(self, db_path: Path, dimension: int, reranker: Reranker | None = None):
         self.db_path = db_path
         self.dimension = dimension
+        self.reranker = reranker
         self._db: lancedb.DBConnection | None = None
         self._table: lancedb.table.Table | None = None
         self._search_cache: lancedb.table.Table | None = None
@@ -107,6 +210,7 @@ class VectorStore:
             pa.field("start_line", pa.int64()),
             pa.field("end_line", pa.int64()),
             pa.field("content", pa.string()),
+            pa.field("fts_content", pa.string()),
             pa.field("description", pa.string()),
             pa.field("mtime", pa.float64()),
             pa.field("path_embedding", pa.list_(pa.float32(), self.dimension)),
@@ -156,7 +260,7 @@ class VectorStore:
 
         try:
             self._table.create_fts_index(
-                "content",
+                "fts_content",
                 replace=True,
                 with_position=False,
                 language="English",
@@ -179,6 +283,7 @@ class VectorStore:
         description: str = "",
         description_embedding: list[float] | None = None,
         mtime: float = 0.0,
+        fts_content: str | None = None,
     ) -> None:
         """Insert or update a chunk's embeddings."""
         if self._table is None:
@@ -191,6 +296,7 @@ class VectorStore:
             "start_line": start_line,
             "end_line": end_line,
             "content": content,
+            "fts_content": fts_content or content,
             "description": description,
             "mtime": mtime,
             "path_embedding": path_embedding,
@@ -220,6 +326,7 @@ class VectorStore:
                 "start_line": c["start_line"],
                 "end_line": c["end_line"],
                 "content": c["content"],
+                "fts_content": c.get("fts_content") or c["content"],
                 "description": c["description"],
                 "mtime": c["mtime"],
                 "path_embedding": c["path_embedding"],
@@ -256,32 +363,23 @@ class VectorStore:
 
         return results[0].get("mtime")
 
-    async def search(
+    async def _search_semantic_raw(
         self,
         query_embedding: list[float],
         limit: int = 10,
         description_weight: float = 0.3,
     ) -> list[SearchResult]:
-        """Search for similar chunks using content and description embeddings.
-
-        Args:
-            query_embedding: The query vector to search with.
-            limit: Maximum number of results to return.
-            description_weight: Weight for description similarity (0-1).
-                Content weight is (1 - description_weight).
-        """
+        """Raw semantic search: content + description embeddings, no post-processing."""
         if self._table is None:
             raise RuntimeError("Not connected to database")
 
-        # Search content embeddings (cosine: 0=identical, 2=opposite)
         content_results = (
             self._table.search(query_embedding, vector_column_name="content_embedding")
             .metric("cosine")
-            .limit(limit * 2)  # Fetch extra for merging
+            .limit(limit * 2)
             .to_list()
         )
 
-        # Search description embeddings (for path-level boosting)
         desc_results = (
             self._table.search(query_embedding, vector_column_name="description_embedding")
             .metric("cosine")
@@ -289,13 +387,10 @@ class VectorStore:
             .to_list()
         )
 
-        # Build lookup of description scores by path
-        # (all chunks from same file share description score)
         desc_scores: dict[str, float] = {}
         for r in desc_results:
             desc_scores[r["path"]] = 1 / (1 + r["_distance"])
 
-        # Combine scores
         content_weight = 1 - description_weight
         results = []
         for r in content_results:
@@ -315,37 +410,52 @@ class VectorStore:
                 description_score=description_score,
             ))
 
-        # Apply category bias, sort, deduplicate, and return top results
+        return results
+
+    async def search(
+        self,
+        query_embedding: list[float],
+        limit: int = 10,
+        description_weight: float = 0.3,
+        query_text: str = "",
+    ) -> list[SearchResult]:
+        """Search for similar chunks using content and description embeddings.
+
+        Args:
+            query_embedding: The query vector to search with.
+            limit: Maximum number of results to return.
+            description_weight: Weight for description similarity (0-1).
+                Content weight is (1 - description_weight).
+            query_text: Original query text for reranking (optional).
+        """
+        fetch = limit * 5 if self.reranker and query_text else limit
+        results = await self._search_semantic_raw(query_embedding, fetch, description_weight)
         results = _apply_category_bias(results)
         results.sort(key=lambda x: x.score, reverse=True)
         results = _deduplicate_by_file(results)
+        if self.reranker and query_text:
+            results = _rerank_results(results, query_text, self.reranker)
         return results[:limit]
 
-    async def search_fts(
+    async def _search_fts_raw(
         self,
         query_text: str,
         limit: int = 10,
     ) -> list[SearchResult]:
-        """Full-text search only (BM25).
-
-        Args:
-            query_text: The text query to search for.
-            limit: Maximum number of results to return.
-        """
+        """Raw full-text search: BM25 results, no post-processing."""
         if self._table is None:
             raise RuntimeError("Not connected to database")
 
         try:
             results = (
                 self._table.search(query_text, query_type="fts")
-                .limit(limit * 3)
+                .limit(limit)
                 .to_list()
             )
         except Exception:
-            # FTS may not be available, return empty results
             return []
 
-        fts_results = [
+        return [
             SearchResult(
                 path=r["path"],
                 chunk_index=r["chunk_index"],
@@ -359,7 +469,24 @@ class VectorStore:
             )
             for r in results
         ]
-        return _deduplicate_by_file(_apply_category_bias(fts_results))[:limit]
+
+    async def search_fts(
+        self,
+        query_text: str,
+        limit: int = 10,
+    ) -> list[SearchResult]:
+        """Full-text search only (BM25).
+
+        Args:
+            query_text: The text query to search for.
+            limit: Maximum number of results to return.
+        """
+        fetch = limit * 5 if self.reranker else limit * 3
+        fts_results = await self._search_fts_raw(query_text, fetch)
+        results = _deduplicate_by_file(_apply_category_bias(fts_results))
+        if self.reranker:
+            results = _rerank_results(results, query_text, self.reranker)
+        return results[:limit]
 
     async def search_hybrid(
         self,
@@ -367,46 +494,27 @@ class VectorStore:
         query_text: str,
         limit: int = 10,
     ) -> list[SearchResult]:
-        """Hybrid search: vector + FTS with RRF reranking.
+        """Hybrid search: vector + FTS with custom weighted RRF.
+
+        Runs semantic and FTS searches separately, then merges their ranked
+        lists using Reciprocal Rank Fusion with tunable weights.
 
         Args:
             query_embedding: The query vector to search with.
             query_text: The text query for FTS.
             limit: Maximum number of results to return.
         """
-        if self._table is None:
-            raise RuntimeError("Not connected to database")
+        fetch = limit * 5 if self.reranker else limit * 3
+        sem_results = await self._search_semantic_raw(query_embedding, limit=fetch)
+        fts_results = await self._search_fts_raw(query_text, limit=fetch)
 
-        try:
-            from lancedb.rerankers import RRFReranker
-
-            results = (
-                self._table.search(query_type="hybrid")
-                .vector(query_embedding)
-                .text(query_text)
-                .rerank(RRFReranker())
-                .limit(limit * 3)
-                .to_list()
-            )
-        except Exception:
-            # Fall back to semantic-only if hybrid fails
-            return await self.search(query_embedding, limit)
-
-        hybrid_results = [
-            SearchResult(
-                path=r["path"],
-                chunk_index=r["chunk_index"],
-                start_line=r["start_line"],
-                end_line=r["end_line"],
-                content=r["content"],
-                description=r.get("description", ""),
-                score=r.get("_relevance_score", 0.0),
-                content_score=r.get("_relevance_score", 0.0),
-                description_score=0.0,
-            )
-            for r in results
-        ]
-        return _deduplicate_by_file(_apply_category_bias(hybrid_results))[:limit]
+        merged = _rrf_merge(sem_results, fts_results, semantic_weight=1.2, fts_weight=0.5)
+        merged = _apply_category_bias(merged)
+        merged.sort(key=lambda x: x.score, reverse=True)
+        merged = _deduplicate_by_file(merged)
+        if self.reranker:
+            merged = _rerank_results(merged, query_text, self.reranker)
+        return merged[:limit]
 
     async def list_all(self) -> dict[str, int]:
         """List all indexed file paths with their chunk counts."""

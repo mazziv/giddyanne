@@ -97,6 +97,14 @@ settings:
 
   # Embedding model
   local_model: "all-MiniLM-L6-v2"
+
+  # Ollama backend (optional, disabled by default)
+  ollama: true
+  ollama_url: "http://localhost:11434"
+  ollama_model: "all-minilm:l6-v2"
+
+  # Reranker (optional, disabled by default)
+  reranker_model: "cross-encoder/ms-marco-MiniLM-L6-v2"
 ```
 
 ## Settings Reference
@@ -148,4 +156,72 @@ Available models:
 - `paraphrase-MiniLM-L3-v2` — Faster, lower quality
 - `nomic-ai/CodeRankEmbed` — Code-specialized (768d), but 5-6x slower indexing with no measurable quality gain. Unusable on laptop hardware for repos over ~100 files.
 
-[← Back to README.md](README.md)
+### Ollama
+
+Use a local [Ollama](https://ollama.com) server for GPU-accelerated embeddings instead of the default sentence-transformers (CPU).
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `ollama` | false | Enable Ollama backend |
+| `ollama_url` | "http://localhost:11434" | Ollama server URL |
+| `ollama_model` | "all-minilm:l6-v2" | Ollama embedding model |
+
+```yaml
+settings:
+  ollama: true
+  ollama_model: "all-minilm:l6-v2"
+```
+
+Without a config file, use the `--ollama` CLI flag instead:
+
+```bash
+giddy up --ollama
+```
+
+For MCP, set the `GIDDY_OLLAMA=1` environment variable in your MCP config.
+
+Requires Ollama running locally with the model pulled (`ollama pull all-minilm:l6-v2`).
+
+### Reranker
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `reranker_model` | "" (disabled) | Cross-encoder model for result reranking |
+
+The reranker is a second-stage scorer that re-evaluates the top search results using a cross-encoder. It improves ranking quality at the cost of slightly slower queries (the model scores each result individually).
+
+```yaml
+settings:
+  reranker_model: "cross-encoder/ms-marco-MiniLM-L6-v2"
+```
+
+Without a config file, use the `--rerank` CLI flag instead:
+
+```bash
+giddy up --rerank
+```
+
+For MCP, set the `GIDDY_RERANK=1` environment variable in your MCP config.
+
+## Global Config
+
+The shared embedding server has its own config at `~/.config/giddyanne/config.yaml`. This is separate from per-project `.giddyanne.yaml` files.
+
+```yaml
+# All fields are optional — defaults shown
+embed_model: "all-MiniLM-L6-v2"
+auto_start: true
+socket_path: "~/.local/state/giddyanne/embed.sock"
+pid_path: "~/.local/state/giddyanne/embed.pid"
+log_path: "~/.local/state/giddyanne/embed.log"
+```
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `embed_model` | "all-MiniLM-L6-v2" | Model the shared server loads |
+| `auto_start` | true | Auto-start the embed server when a project server starts |
+| `socket_path` | `~/.local/state/giddyanne/embed.sock` | Unix socket for embed server |
+| `pid_path` | `~/.local/state/giddyanne/embed.pid` | PID file location |
+| `log_path` | `~/.local/state/giddyanne/embed.log` | Log file location |
+
+Set `auto_start: false` to disable the shared server and fall back to in-process embedding (each project loads its own model copy).

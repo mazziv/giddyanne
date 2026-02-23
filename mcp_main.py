@@ -29,14 +29,16 @@ async def main():
         project_config = ProjectConfig.default(root_path)
         storage_dir = ProjectConfig.get_tmp_storage_dir(root_path)
 
+    # GIDDY_RERANK env var: enable default reranker if not already configured
+    if os.environ.get("GIDDY_RERANK") and not project_config.settings.reranker_model:
+        project_config.settings.reranker_model = "cross-encoder/ms-marco-MiniLM-L6-v2"
+
+    # GIDDY_OLLAMA env var: use Ollama backend
+    if os.environ.get("GIDDY_OLLAMA"):
+        project_config.settings.ollama = True
+
     # Initialize all components
     c = await create_components(root_path, project_config, storage_dir, log_filename="mcp.log")
-
-    # Test embedding provider before indexing
-    try:
-        await c.provider.embed("test")
-    except Exception as e:
-        print(f"Warning: Embedding provider failed: {e}", file=sys.stderr)
 
     # Index synchronously (MCP needs index ready before serving)
     await run_indexing(c)

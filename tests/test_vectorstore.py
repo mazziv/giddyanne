@@ -8,7 +8,20 @@ from src.vectorstore import (
     _apply_category_bias,
     _classify_file,
     _deduplicate_by_file,
+    _rerank_results,
+    _rrf_merge,
 )
+
+
+def _make_fts(path: str, content: str, header: str = "") -> str:
+    """Build fts_content string for tests (matches engine._build_fts_content)."""
+    from pathlib import Path as P
+
+    basename = P(path).name
+    header_part = f" {header}" if header else ""
+    boost_line = f"{path} {basename}{header_part}"
+    prefix = "\n".join([boost_line] * 3)
+    return f"{prefix}\n{content}"
 
 
 class TestSearchResult:
@@ -371,6 +384,11 @@ class TestVectorStore:
             start_line=1,
             end_line=20,
             content="def authenticate_user(username, password): pass",
+            fts_content=_make_fts(
+                "auth.py",
+                "def authenticate_user(username, password): pass",
+                "authenticate_user",
+            ),
             path_embedding=embedding,
             content_embedding=embedding,
         )
@@ -380,16 +398,94 @@ class TestVectorStore:
             start_line=1,
             end_line=20,
             content="def query_database(sql): pass",
+            fts_content=_make_fts(
+                "db.py", "def query_database(sql): pass",
+                "query_database",
+            ),
             path_embedding=embedding,
             content_embedding=embedding,
         )
 
-        # FTS should find the file with "authenticate" in content
+        # FTS should find the file with "authenticate" in fts_content
         results = await store.search_fts("authenticate", limit=5)
 
         # May return empty if FTS index isn't ready, which is valid
         if results:
             assert results[0].path == "/auth.py"
+
+    @pytest.mark.asyncio
+    async def test_search_fts_matches_path_terms(self, store):
+        """FTS matches path terms from boosted fts_content prefix."""
+        embedding = [0.1] * 128
+
+        await store.upsert(
+            path="/src/auth/session.py",
+            chunk_index=0,
+            start_line=1,
+            end_line=20,
+            content="def validate_token(): pass",
+            fts_content=_make_fts(
+                "src/auth/session.py",
+                "def validate_token(): pass",
+                "validate_token",
+            ),
+            path_embedding=embedding,
+            content_embedding=embedding,
+        )
+        await store.upsert(
+            path="/src/utils/helpers.py",
+            chunk_index=0,
+            start_line=1,
+            end_line=20,
+            content="def format_string(): pass",
+            fts_content=_make_fts(
+                "src/utils/helpers.py",
+                "def format_string(): pass",
+                "format_string",
+            ),
+            path_embedding=embedding,
+            content_embedding=embedding,
+        )
+
+        # Searching "session" should find session.py via path boosting
+        results = await store.search_fts("session", limit=5)
+        if results:
+            assert results[0].path == "/src/auth/session.py"
+
+    @pytest.mark.asyncio
+    async def test_search_fts_matches_symbol_names(self, store):
+        """FTS matches symbol names from header in fts_content prefix."""
+        embedding = [0.1] * 128
+
+        await store.upsert(
+            path="/models.py",
+            chunk_index=0,
+            start_line=1,
+            end_line=20,
+            content="class User:\n    name: str",
+            fts_content=_make_fts(
+                "models.py", "class User:\n    name: str", "User",
+            ),
+            path_embedding=embedding,
+            content_embedding=embedding,
+        )
+        await store.upsert(
+            path="/views.py",
+            chunk_index=0,
+            start_line=1,
+            end_line=20,
+            content="def render_page(): pass",
+            fts_content=_make_fts(
+                "views.py", "def render_page(): pass", "render_page",
+            ),
+            path_embedding=embedding,
+            content_embedding=embedding,
+        )
+
+        # Searching "render_page" should find views.py
+        results = await store.search_fts("render_page", limit=5)
+        if results:
+            assert results[0].path == "/views.py"
 
     @pytest.mark.asyncio
     async def test_search_fts_empty_on_no_match(self, store):
@@ -402,6 +498,7 @@ class TestVectorStore:
             start_line=1,
             end_line=20,
             content="hello world",
+            fts_content=_make_fts("file.py", "hello world"),
             path_embedding=embedding,
             content_embedding=embedding,
         )
@@ -422,6 +519,10 @@ class TestVectorStore:
             start_line=1,
             end_line=20,
             content="def authenticate_user(): pass",
+            fts_content=_make_fts(
+                "auth.py", "def authenticate_user(): pass",
+                "authenticate_user",
+            ),
             path_embedding=auth_embedding,
             content_embedding=auth_embedding,
         )
@@ -431,6 +532,10 @@ class TestVectorStore:
             start_line=1,
             end_line=20,
             content="def query_database(): pass",
+            fts_content=_make_fts(
+                "db.py", "def query_database(): pass",
+                "query_database",
+            ),
             path_embedding=db_embedding,
             content_embedding=db_embedding,
         )
@@ -456,6 +561,7 @@ class TestVectorStore:
             start_line=1,
             end_line=20,
             content="test content",
+            fts_content=_make_fts("file.py", "test content"),
             path_embedding=embedding,
             content_embedding=embedding,
         )
@@ -668,3 +774,235 @@ class TestCategoryBiasIntegration:
 
         results = await store.search(query_embedding=embedding, limit=10)
         assert results[0].path == "src/search.py"
+
+
+class TestRRFMerge:
+    def _make_result(self, path: str, chunk_index: int = 0, score: float = 0.0,
+                     content_score: float = 0.0, description_score: float = 0.0) -> SearchResult:
+        return SearchResult(
+            path=path, chunk_index=chunk_index, start_line=1, end_line=10,
+            content="content", description="", score=score,
+            content_score=content_score, description_score=description_score,
+        )
+
+    def test_overlapping_results_fused(self):
+        """Same chunk in both lists gets scores from both."""
+        sem = [self._make_result("/a.py", content_score=0.9)]
+        fts = [self._make_result("/a.py", content_score=0.5)]
+
+        merged = _rrf_merge(sem, fts)
+        assert len(merged) == 1
+        assert merged[0].path == "/a.py"
+        # score = 1/(60+1) + 1/(60+1) = 2/61
+        expected = 1.0 / 61 + 1.0 / 61
+        assert merged[0].score == pytest.approx(expected)
+
+    def test_non_overlapping_results(self):
+        """Disjoint results appear in merged list."""
+        sem = [self._make_result("/a.py", content_score=0.9)]
+        fts = [self._make_result("/b.py", content_score=0.5)]
+
+        merged = _rrf_merge(sem, fts)
+        assert len(merged) == 2
+        paths = {r.path for r in merged}
+        assert paths == {"/a.py", "/b.py"}
+
+    def test_equal_weights_standard_rrf(self):
+        """With equal weights, RRF score is standard formula."""
+        sem = [
+            self._make_result("/a.py"),
+            self._make_result("/b.py"),
+        ]
+        fts = [
+            self._make_result("/b.py"),
+            self._make_result("/a.py"),
+        ]
+        merged = _rrf_merge(sem, fts, semantic_weight=1.0, fts_weight=1.0, k=60)
+        scores = {r.path: r.score for r in merged}
+        # /a.py: sem rank 1, fts rank 2 → 1/61 + 1/62
+        # /b.py: sem rank 2, fts rank 1 → 1/62 + 1/61
+        # Both should have the same score
+        assert scores["/a.py"] == pytest.approx(scores["/b.py"])
+
+    def test_zero_semantic_weight(self):
+        """With semantic_weight=0, only FTS ranking matters."""
+        sem = [self._make_result("/a.py")]
+        fts = [
+            self._make_result("/b.py"),
+            self._make_result("/a.py"),
+        ]
+        merged = _rrf_merge(sem, fts, semantic_weight=0.0, fts_weight=1.0)
+        scores = {r.path: r.score for r in merged}
+        # /a.py: sem contributes 0, fts rank 2 → 1/62
+        # /b.py: fts rank 1 → 1/61
+        assert scores["/b.py"] > scores["/a.py"]
+
+    def test_zero_fts_weight(self):
+        """With fts_weight=0, only semantic ranking matters."""
+        sem = [
+            self._make_result("/a.py"),
+            self._make_result("/b.py"),
+        ]
+        fts = [self._make_result("/b.py")]
+        merged = _rrf_merge(sem, fts, semantic_weight=1.0, fts_weight=0.0)
+        scores = {r.path: r.score for r in merged}
+        # /a.py: sem rank 1 → 1/61
+        # /b.py: sem rank 2, fts contributes 0 → 1/62
+        assert scores["/a.py"] > scores["/b.py"]
+
+    def test_preserves_content_and_description_scores(self):
+        """Original content_score and description_score are preserved."""
+        sem = [self._make_result("/a.py", content_score=0.9, description_score=0.7)]
+        fts = []
+        merged = _rrf_merge(sem, fts)
+        assert merged[0].content_score == 0.9
+        assert merged[0].description_score == 0.7
+
+    def test_chunk_level_keying(self):
+        """Different chunks from the same file are treated separately."""
+        sem = [self._make_result("/a.py", chunk_index=0)]
+        fts = [self._make_result("/a.py", chunk_index=1)]
+        merged = _rrf_merge(sem, fts)
+        assert len(merged) == 2
+
+    def test_empty_inputs(self):
+        """Empty inputs produce empty output."""
+        assert _rrf_merge([], []) == []
+        sem = [self._make_result("/a.py")]
+        merged = _rrf_merge(sem, [])
+        assert len(merged) == 1
+        merged = _rrf_merge([], sem)
+        assert len(merged) == 1
+
+
+class TestRerankerHelper:
+    def _make_result(self, path: str, score: float, content: str = "content") -> SearchResult:
+        return SearchResult(
+            path=path, chunk_index=0, start_line=1, end_line=10,
+            content=content, description="", score=score,
+            content_score=score, description_score=0.0,
+        )
+
+    def test_rerank_replaces_scores_and_sorts(self):
+        """_rerank_results replaces scores with cross-encoder scores and re-sorts."""
+        from unittest.mock import MagicMock
+
+        reranker = MagicMock()
+        reranker.rerank.return_value = [0.1, 0.9, 0.5]
+
+        results = [
+            self._make_result("/a.py", 0.9, "content a"),
+            self._make_result("/b.py", 0.8, "content b"),
+            self._make_result("/c.py", 0.7, "content c"),
+        ]
+
+        reranked = _rerank_results(results, "test query", reranker)
+
+        # Should be sorted by new scores: b(0.9), c(0.5), a(0.1)
+        assert reranked[0].path == "/b.py"
+        assert reranked[0].score == 0.9
+        assert reranked[1].path == "/c.py"
+        assert reranked[1].score == 0.5
+        assert reranked[2].path == "/a.py"
+        assert reranked[2].score == 0.1
+
+        reranker.rerank.assert_called_once_with(
+            "test query", ["content a", "content b", "content c"]
+        )
+
+    def test_rerank_empty_results(self):
+        """Empty results returns empty without calling reranker."""
+        from unittest.mock import MagicMock
+
+        reranker = MagicMock()
+        result = _rerank_results([], "query", reranker)
+        assert result == []
+        reranker.rerank.assert_not_called()
+
+    def test_rerank_preserves_metadata(self):
+        """Reranking preserves content_score and description_score."""
+        from unittest.mock import MagicMock
+
+        reranker = MagicMock()
+        reranker.rerank.return_value = [5.0]
+
+        results = [SearchResult(
+            path="/a.py", chunk_index=2, start_line=10, end_line=20,
+            content="hello", description="desc", score=0.5,
+            content_score=0.8, description_score=0.3,
+        )]
+
+        reranked = _rerank_results(results, "query", reranker)
+        assert reranked[0].content_score == 0.8
+        assert reranked[0].description_score == 0.3
+        assert reranked[0].chunk_index == 2
+        assert reranked[0].start_line == 10
+
+
+class TestVectorStoreReranker:
+    """Integration: VectorStore with mock reranker changes result order."""
+
+    @pytest.fixture
+    def db_path(self, tmp_path):
+        return tmp_path / "test_reranker.lance"
+
+    @pytest.fixture
+    async def store_with_reranker(self, db_path):
+        from unittest.mock import MagicMock
+
+        reranker = MagicMock()
+        # Reverse the order: give lower-ranked results higher scores
+        reranker.rerank.side_effect = lambda q, docs: list(
+            reversed([float(i) for i in range(len(docs))])
+        )
+        store = VectorStore(db_path, dimension=128, reranker=reranker)
+        await store.connect()
+        yield store
+        await store.close()
+
+    @pytest.fixture
+    async def store_no_reranker(self, db_path):
+        store = VectorStore(db_path, dimension=128)
+        await store.connect()
+        yield store
+        await store.close()
+
+    @pytest.mark.asyncio
+    async def test_semantic_search_with_reranker(self, store_with_reranker):
+        """Semantic search with reranker reorders results."""
+        store = store_with_reranker
+        high_emb = [0.9] + [0.1] * 127
+        low_emb = [0.1] + [0.9] + [0.1] * 126
+
+        await store.upsert("/high.py", 0, 1, 20, "high match", high_emb, high_emb)
+        await store.upsert("/low.py", 0, 1, 20, "low match", low_emb, low_emb)
+
+        # With query_text, reranker fires and reverses order
+        results = await store.search(
+            query_embedding=high_emb, limit=10, query_text="test query"
+        )
+        assert len(results) >= 2
+        # Reranker reverses: last gets highest score
+        assert store.reranker.rerank.called
+
+    @pytest.mark.asyncio
+    async def test_semantic_search_without_query_text_skips_reranker(self, store_with_reranker):
+        """Semantic search without query_text does not rerank."""
+        store = store_with_reranker
+        emb = [0.9] + [0.1] * 127
+        await store.upsert("/file.py", 0, 1, 20, "content", emb, emb)
+
+        results = await store.search(query_embedding=emb, limit=10)
+        assert len(results) == 1
+        store.reranker.rerank.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_no_reranker_existing_behavior(self, store_no_reranker):
+        """VectorStore without reranker maintains existing behavior."""
+        store = store_no_reranker
+        emb = [0.9] + [0.1] * 127
+        await store.upsert("/file.py", 0, 1, 20, "content", emb, emb)
+
+        results = await store.search(query_embedding=emb, limit=10)
+        assert len(results) == 1
+        assert results[0].path == "/file.py"

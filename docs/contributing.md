@@ -5,7 +5,7 @@ Contributions welcome!
 ## Development Setup
 
 ```bash
-git clone https://github.com/mazziv/giddyanne.git
+git clone https://github.com/upship-ai/giddyanne.git
 cd giddyanne
 
 # Build everything
@@ -37,7 +37,7 @@ giddyanne/
 └── vscode/              # VSCode extension
 ```
 
-For how these pieces fit together — the indexing pipeline, search internals, file watching, and design decisions — see [ARCHITECTURE.md](ARCHITECTURE.md).
+For how these pieces fit together — the indexing pipeline, search internals, file watching, and design decisions — see [Architecture](architecture.md).
 
 ## Help Wanted
 
@@ -58,5 +58,3 @@ A plugin that calls the CLI and populates quickfix:
 - Basic commands: up, down, status
 
 Open an issue to discuss or submit a PR.
-
-[← Back to README.md](README.md)

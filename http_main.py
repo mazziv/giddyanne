@@ -135,7 +135,10 @@ def stop_server(storage_dir: Path) -> bool:
         return False
 
 
-def spawn_daemon(root_path: Path, port: int, host: str, verbose: bool = False) -> None:
+def spawn_daemon(
+    root_path: Path, port: int, host: str,
+    verbose: bool = False, rerank: bool = False, ollama: bool = False,
+) -> None:
     """Spawn a new background process instead of forking.
 
     Fork-based daemonization doesn't work with threading libraries
@@ -151,6 +154,10 @@ def spawn_daemon(root_path: Path, port: int, host: str, verbose: bool = False) -
            "--port", str(port), "--host", host]
     if verbose:
         cmd.append("--verbose")
+    if rerank:
+        cmd.append("--rerank")
+    if ollama:
+        cmd.append("--ollama")
 
     with open(os.devnull, "w") as devnull:
         subprocess.Popen(
@@ -268,6 +275,16 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Enable debug logging"
     )
+    parser.add_argument(
+        "--rerank",
+        action="store_true",
+        help="Enable cross-encoder reranking"
+    )
+    parser.add_argument(
+        "--ollama",
+        action="store_true",
+        help="Use Ollama for embeddings (GPU-accelerated)"
+    )
     return parser.parse_args()
 
 
@@ -290,6 +307,14 @@ if __name__ == "__main__":
     except ConfigError as e:
         print(f"Configuration error: {e}", file=sys.stderr)
         sys.exit(1)
+
+    # --rerank flag: enable default reranker if not already configured
+    if args.rerank and not project_config.settings.reranker_model:
+        project_config.settings.reranker_model = "cross-encoder/ms-marco-MiniLM-L6-v2"
+
+    # --ollama flag or GIDDY_OLLAMA env var: use Ollama backend
+    if args.ollama or os.environ.get("GIDDY_OLLAMA"):
+        project_config.settings.ollama = True
 
     # Handle --status (doesn't need config)
     if args.status:
@@ -331,7 +356,10 @@ if __name__ == "__main__":
 
     # Handle --daemon: spawn a new background process and exit
     if args.daemon:
-        spawn_daemon(root_path, port, host, args.verbose)
+        spawn_daemon(
+            root_path, port, host, args.verbose, args.rerank,
+            project_config.settings.ollama,
+        )
         print(f"Server starting on port {port}")
         sys.exit(0)
 

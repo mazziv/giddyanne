@@ -2,11 +2,13 @@
 package main
 
 import (
+	"bufio"
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -60,16 +62,19 @@ type StatusResponse struct {
 
 // StatsResponse is the API response for /stats.
 type StatsResponse struct {
-	IndexedFiles      int            `json:"indexed_files"`
-	TotalChunks       int            `json:"total_chunks"`
-	IndexSizeBytes    int64          `json:"index_size_bytes"`
-	AvgQueryLatencyMs *float64       `json:"avg_query_latency_ms"`
-	StartupDurationMs *float64       `json:"startup_duration_ms"`
-	Files             map[string]int `json:"files"` // path -> chunk count
+	IndexedFiles       int            `json:"indexed_files"`
+	TotalChunks        int            `json:"total_chunks"`
+	IndexSizeBytes     int64          `json:"index_size_bytes"`
+	AvgQueryLatencyMs  *float64       `json:"avg_query_latency_ms"`
+	StartupDurationMs  *float64       `json:"startup_duration_ms"`
+	TruncatedChunks    *int           `json:"truncated_chunks"`
+	TotalEmbeddedTexts *int           `json:"total_embedded_texts"`
+	ContentCoveragePct *float64       `json:"content_coverage_pct"`
+	Files              map[string]int `json:"files"` // path -> chunk count
 }
 
 // commands defines all available commands with their full names.
-var commands = []string{"up", "down", "bounce", "find", "log", "status", "health", "sitemap", "init", "install", "mcp", "clean", "drop", "completion", "help"}
+var commands = []string{"up", "down", "bounce", "find", "log", "status", "health", "sitemap", "init", "install", "mcp", "embed", "clean", "drop", "completion", "help"}
 
 // matchCommand finds a command by prefix. Returns the command name or empty string if ambiguous/not found.
 func matchCommand(input string) (string, []string) {
@@ -150,6 +155,8 @@ func main() {
 		runInstall()
 	case "mcp":
 		runMcp()
+	case "embed":
+		runEmbed(os.Args[2:])
 	case "clean":
 		runClean(os.Args[2:])
 	case "drop":
@@ -176,6 +183,7 @@ Usage:
   giddy init                      Print setup prompt for new projects
   giddy install                   Download embedding model (~90MB, one-time)
   giddy mcp                       Run MCP server (for Claude Code)
+  giddy embed <start|stop|status> Manage shared embedding server
   giddy drop                      Remove search index (keeps logs)
   giddy clean [options]           Remove all .giddyanne data
   giddy completion <shell>        Generate shell completions (bash, zsh, fish)
@@ -194,6 +202,8 @@ Find options:
 Up/Bounce options:
   --port N       Preferred port (will find available if in use)
   --host ADDR    Host to bind to (default: from config)
+  --rerank       Enable cross-encoder reranking
+  --ollama       Use Ollama for embeddings (GPU-accelerated)
   --verbose      Enable debug logging
 
 Health options:
@@ -399,7 +409,7 @@ func getGiddyDir() (string, error) {
 	return dir, nil
 }
 
-func startServer(root, storageDir string, verbose bool, portOverride int, hostOverride string) (int, error) {
+func startServer(root, storageDir string, verbose, rerank, ollama bool, portOverride int, hostOverride string) (int, error) {
 	// Find giddy installation directory
 	giddyDir, err := getGiddyDir()
 	if err != nil {
@@ -427,6 +437,12 @@ func startServer(root, storageDir string, verbose bool, portOverride int, hostOv
 	}
 	if verbose {
 		args = append(args, "--verbose")
+	}
+	if rerank {
+		args = append(args, "--rerank")
+	}
+	if ollama {
+		args = append(args, "--ollama")
 	}
 
 	// Always run as daemon
@@ -460,7 +476,7 @@ func ensureServer(root, storageDir string) (int, error) {
 			return port, nil
 		}
 	}
-	return startServer(root, storageDir, false, 0, "")
+	return startServer(root, storageDir, false, false, false, 0, "")
 }
 
 // waitForReady polls /status until the server is done indexing.
@@ -692,6 +708,8 @@ func runSearch(args []string) {
 
 func runStart(args []string) {
 	verbose := false
+	rerank := false
+	ollama := false
 	portOverride := 0
 	hostOverride := ""
 
@@ -701,6 +719,12 @@ func runStart(args []string) {
 		switch args[i] {
 		case "--verbose", "-v":
 			verbose = true
+			i++
+		case "--rerank":
+			rerank = true
+			i++
+		case "--ollama":
+			ollama = true
 			i++
 		case "--port":
 			if i+1 >= len(args) {
@@ -744,7 +768,7 @@ func runStart(args []string) {
 	}
 
 	fmt.Println("Starting server...")
-	port, err := startServer(root, storageDir, verbose, portOverride, hostOverride)
+	port, err := startServer(root, storageDir, verbose, rerank, ollama, portOverride, hostOverride)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
@@ -795,6 +819,8 @@ func runStop() {
 
 func runBounce(args []string) {
 	verbose := false
+	rerank := false
+	ollama := false
 	portOverride := 0
 	hostOverride := ""
 
@@ -804,6 +830,12 @@ func runBounce(args []string) {
 		switch args[i] {
 		case "--verbose", "-v":
 			verbose = true
+			i++
+		case "--rerank":
+			rerank = true
+			i++
+		case "--ollama":
+			ollama = true
 			i++
 		case "--port":
 			if i+1 >= len(args) {
@@ -860,7 +892,7 @@ func runBounce(args []string) {
 
 	// Start server
 	fmt.Println("Starting server...")
-	port, err := startServer(root, storageDir, verbose, portOverride, hostOverride)
+	port, err := startServer(root, storageDir, verbose, rerank, ollama, portOverride, hostOverride)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
@@ -985,6 +1017,10 @@ func runStats(args []string) {
 		fmt.Printf("Avg latency:   %.2f ms\n", *stats.AvgQueryLatencyMs)
 	} else {
 		fmt.Printf("Avg latency:   (no queries yet)\n")
+	}
+	if stats.ContentCoveragePct != nil && stats.TruncatedChunks != nil && stats.TotalEmbeddedTexts != nil {
+		fmt.Printf("Embed coverage: %.1f%% (%d/%d texts truncated)\n",
+			*stats.ContentCoveragePct, *stats.TruncatedChunks, *stats.TotalEmbeddedTexts)
 	}
 
 	if verbose && len(stats.Files) > 0 {
@@ -1554,13 +1590,16 @@ func runMcp() {
 		os.Exit(1)
 	}
 
+	// Forward env vars (GIDDY_RERANK, GIDDY_OLLAMA already in os.Environ if set)
+	env := append(os.Environ(), fmt.Sprintf("GIDDY_WATCH_PATH=%s", root))
+
 	// Run MCP server with stdio connected (Python determines storage_dir itself)
 	cmd := exec.Command(pythonPath, mcpMainPath)
 	cmd.Dir = root
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	cmd.Env = append(os.Environ(), fmt.Sprintf("GIDDY_WATCH_PATH=%s", root))
+	cmd.Env = env
 
 	if err := cmd.Run(); err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
@@ -1568,6 +1607,244 @@ func runMcp() {
 		}
 		fmt.Fprintf(os.Stderr, "MCP server error: %v\n", err)
 		os.Exit(1)
+	}
+}
+
+const embedStateDir = ".local/state/giddyanne"
+
+func getEmbedPaths() (socketPath, pidPath string) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Cannot determine home directory: %v\n", err)
+		os.Exit(1)
+	}
+	stateDir := filepath.Join(home, embedStateDir)
+	return filepath.Join(stateDir, "embed.sock"), filepath.Join(stateDir, "embed.pid")
+}
+
+func isEmbedServerRunning(pidPath string) int {
+	data, err := os.ReadFile(pidPath)
+	if err != nil {
+		return 0
+	}
+	pid, err := strconv.Atoi(strings.TrimSpace(string(data)))
+	if err != nil {
+		return 0
+	}
+	process, err := os.FindProcess(pid)
+	if err != nil {
+		return 0
+	}
+	if err := process.Signal(syscall.Signal(0)); err != nil {
+		os.Remove(pidPath)
+		return 0
+	}
+	return pid
+}
+
+func isEmbedServerHealthy(socketPath string) bool {
+	conn, err := net.DialTimeout("unix", socketPath, 2*time.Second)
+	if err != nil {
+		return false
+	}
+	defer conn.Close()
+
+	// Send raw HTTP request
+	fmt.Fprintf(conn, "GET /health HTTP/1.0\r\nHost: localhost\r\n\r\n")
+	conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	reader := bufio.NewReader(conn)
+	line, err := reader.ReadString('\n')
+	if err != nil {
+		return false
+	}
+	return strings.Contains(line, "200")
+}
+
+func runEmbed(args []string) {
+	if len(args) < 1 {
+		fmt.Fprintln(os.Stderr, "Usage: giddy embed <start|stop|status> [options]")
+		os.Exit(1)
+	}
+
+	subcmd := args[0]
+	subArgs := args[1:]
+
+	switch subcmd {
+	case "start":
+		runEmbedStart(subArgs)
+	case "stop":
+		runEmbedStop()
+	case "status":
+		runEmbedStatus()
+	default:
+		fmt.Fprintf(os.Stderr, "Unknown embed subcommand: %s\n", subcmd)
+		fmt.Fprintln(os.Stderr, "Usage: giddy embed <start|stop|status>")
+		os.Exit(1)
+	}
+}
+
+func runEmbedStart(args []string) {
+	verbose := false
+	model := ""
+
+	i := 0
+	for i < len(args) {
+		switch args[i] {
+		case "--verbose", "-v":
+			verbose = true
+			i++
+		case "--model":
+			if i+1 >= len(args) {
+				fmt.Fprintln(os.Stderr, "--model requires a value")
+				os.Exit(1)
+			}
+			model = args[i+1]
+			i += 2
+		default:
+			fmt.Fprintf(os.Stderr, "Unknown option: %s\n", args[i])
+			os.Exit(1)
+		}
+	}
+
+	socketPath, pidPath := getEmbedPaths()
+
+	// Check if already running
+	if pid := isEmbedServerRunning(pidPath); pid != 0 {
+		fmt.Printf("Embed server already running (PID %d)\n", pid)
+		return
+	}
+
+	// Find giddy installation directory
+	giddyDir, err := getGiddyDir()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to find giddy installation: %v\n", err)
+		os.Exit(1)
+	}
+
+	pythonPath := filepath.Join(giddyDir, ".venv/bin/python")
+	if _, err := os.Stat(pythonPath); err != nil {
+		fmt.Fprintf(os.Stderr, "Python venv not found at %s (run install first)\n", pythonPath)
+		os.Exit(1)
+	}
+
+	embedScript := filepath.Join(giddyDir, "embed_server.py")
+	if _, err := os.Stat(embedScript); err != nil {
+		fmt.Fprintf(os.Stderr, "embed_server.py not found at %s\n", embedScript)
+		os.Exit(1)
+	}
+
+	cmdArgs := []string{embedScript, "--daemon", "--socket", socketPath}
+	if model != "" {
+		cmdArgs = append(cmdArgs, "--model", model)
+	}
+	if verbose {
+		cmdArgs = append(cmdArgs, "--verbose")
+	}
+
+	cmd := exec.Command(pythonPath, cmdArgs...)
+	if err := cmd.Run(); err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to start embed server: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Println("Starting embed server...")
+
+	// Poll for health
+	for i := 0; i < 60; i++ {
+		time.Sleep(500 * time.Millisecond)
+		if isEmbedServerHealthy(socketPath) {
+			pid := isEmbedServerRunning(pidPath)
+			fmt.Printf("Embed server ready (PID %d)\n", pid)
+			return
+		}
+	}
+
+	fmt.Fprintln(os.Stderr, "Embed server started but did not become healthy")
+	os.Exit(1)
+}
+
+func runEmbedStop() {
+	_, pidPath := getEmbedPaths()
+
+	pid := isEmbedServerRunning(pidPath)
+	if pid == 0 {
+		fmt.Println("Embed server not running")
+		return
+	}
+
+	process, err := os.FindProcess(pid)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error finding process: %v\n", err)
+		os.Exit(1)
+	}
+
+	if err := process.Signal(syscall.SIGTERM); err != nil {
+		fmt.Fprintf(os.Stderr, "Error stopping embed server: %v\n", err)
+		os.Exit(1)
+	}
+
+	for i := 0; i < 30; i++ {
+		time.Sleep(100 * time.Millisecond)
+		if err := process.Signal(syscall.Signal(0)); err != nil {
+			break
+		}
+	}
+
+	os.Remove(pidPath)
+	fmt.Println("Embed server stopped")
+}
+
+func runEmbedStatus() {
+	socketPath, pidPath := getEmbedPaths()
+
+	pid := isEmbedServerRunning(pidPath)
+	if pid == 0 {
+		fmt.Println("Not running")
+		os.Exit(1)
+	}
+
+	if !isEmbedServerHealthy(socketPath) {
+		fmt.Printf("Starting... (PID %d)\n", pid)
+		return
+	}
+
+	// Query /health for loaded models
+	conn, err := net.DialTimeout("unix", socketPath, 2*time.Second)
+	if err != nil {
+		fmt.Printf("Running (PID %d)\n", pid)
+		return
+	}
+	defer conn.Close()
+
+	fmt.Fprintf(conn, "GET /health HTTP/1.0\r\nHost: localhost\r\n\r\n")
+	conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+
+	// Read full response
+	body, err := io.ReadAll(conn)
+	if err != nil {
+		fmt.Printf("Running (PID %d)\n", pid)
+		return
+	}
+
+	// Split headers from body
+	parts := strings.SplitN(string(body), "\r\n\r\n", 2)
+	if len(parts) < 2 {
+		fmt.Printf("Running (PID %d)\n", pid)
+		return
+	}
+
+	var healthResp struct {
+		Status       string   `json:"status"`
+		ModelsLoaded []string `json:"models_loaded"`
+	}
+	if err := json.Unmarshal([]byte(parts[1]), &healthResp); err != nil {
+		fmt.Printf("Running (PID %d)\n", pid)
+		return
+	}
+
+	fmt.Printf("Running (PID %d)\n", pid)
+	if len(healthResp.ModelsLoaded) > 0 {
+		fmt.Printf("Models: %s\n", strings.Join(healthResp.ModelsLoaded, ", "))
 	}
 }
 
@@ -1599,7 +1876,7 @@ _giddy_completions() {
     local prev="${COMP_WORDS[COMP_CWORD-1]}"
 
     # Commands
-    local commands="up down bounce find log status health sitemap init install mcp clean drop completion help"
+    local commands="up down bounce find log status health sitemap init install mcp embed clean drop completion help"
 
     # Complete command as first argument
     if [[ ${COMP_CWORD} -eq 1 ]]; then
@@ -1625,7 +1902,7 @@ _giddy_completions() {
                     return
                     ;;
             esac
-            COMPREPLY=($(compgen -W "--port --host --verbose" -- "${cur}"))
+            COMPREPLY=($(compgen -W "--port --host --rerank --ollama --verbose" -- "${cur}"))
             ;;
         health|he)
             COMPREPLY=($(compgen -W "--verbose" -- "${cur}"))
@@ -1682,6 +1959,8 @@ _giddy() {
     up_opts=(
         '--port[Server port]:port:'
         '--host[Host to bind]:host:'
+        '--rerank[Enable cross-encoder reranking]'
+        '--ollama[Use Ollama for embeddings]'
         '--verbose[Enable debug logging]'
     )
     health_opts=(
@@ -1771,6 +2050,8 @@ complete -c giddy -n '__fish_seen_subcommand_from find f' -l hybrid -d 'Both com
 # up/bounce options
 complete -c giddy -n '__fish_seen_subcommand_from up u bounce bo' -l port -d 'Server port' -r
 complete -c giddy -n '__fish_seen_subcommand_from up u bounce bo' -l host -d 'Host to bind' -r
+complete -c giddy -n '__fish_seen_subcommand_from up u bounce bo' -l rerank -d 'Enable cross-encoder reranking'
+complete -c giddy -n '__fish_seen_subcommand_from up u bounce bo' -l ollama -d 'Use Ollama for embeddings'
 complete -c giddy -n '__fish_seen_subcommand_from up u bounce bo' -l verbose -d 'Enable debug logging'
 
 # health options

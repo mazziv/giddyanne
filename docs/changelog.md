@@ -2,6 +2,29 @@
 
 All notable changes to giddyanne will be documented in this file.
 
+## [1.5.0] - 2026-02-22
+
+### Added
+
+- **Shared embedding server**: A global singleton service (`embed_server.py`) that loads the embedding model once and serves all project servers over a Unix socket. Project servers that previously loaded their own ~900MB model copy now proxy through the shared server at ~180MB each. Auto-starts on `giddy up` if not already running. Manage directly with `giddy embed start|stop|status`. Configurable via `~/.config/giddyanne/config.yaml` (socket path, model, auto_start). Falls back to in-process embedding if the shared server is unavailable.
+- **`giddy embed` CLI command**: `giddy embed start`, `giddy embed stop`, `giddy embed status` for managing the shared embedding server independently of any project.
+- **Global config** (`~/.config/giddyanne/config.yaml`): Optional config for the shared embedding service — socket path, PID/log paths, model name, and auto_start toggle.
+- **Cross-encoder reranker** (C4): Optional second-stage reranker using `cross-encoder/ms-marco-MiniLM-L6-v2` (22.7M params). Over-fetches candidates (5x instead of 3x), runs existing pipeline (RRF, category bias, dedup), then re-scores with the cross-encoder before returning. Opt-in via `reranker_model` in `.giddyanne.yaml`. Uses `CrossEncoder` from sentence-transformers (no new dependency). Benchmarks: giddyanne recall 35%→80% (hybrid), MRR 0.34→0.90. test_2 FTS recall 60%→70%, MRR 0.40→0.70. test_1 MRR improved (+0.05-0.15) but semantic recall regressed 87%→67% on one query where the right file wasn't in the candidate pool. Disabled by default — best for repos where relevant files are retrieved but poorly ranked.
+- **`--rerank` CLI flag**: Enable the cross-encoder reranker without a config file. `giddy up --rerank` and `giddy bounce --rerank` apply the default reranker model. For MCP, set `GIDDY_RERANK=1` environment variable.
+- **Token-aware chunk splitting**: After language-aware chunking, oversized chunks are recursively halved until they fit the model's token budget (256 tokens for MiniLM). Eliminates silent embedding truncation — content coverage went from 56% to 100%. Chunk count roughly doubles (313→740 for giddyanne repo). Benchmarks: test_2 recall 70%→77%, MRR 0.70→0.85. Semantic-only search now matches old hybrid baseline. Index times ~2x from more chunks. Ollama backend now impractical without batching (timed out at 600s on 32 files due to per-request HTTP overhead × ~2200 embed calls).
+- **Ollama embedding backend**: GPU-accelerated embeddings via a local Ollama server. Opt-in via `--ollama` CLI flag, `GIDDY_OLLAMA=1` env var, or `ollama: true` in config. Configurable URL and model (`ollama_url`, `ollama_model`). Default model: `all-minilm:l6-v2`.
+- **Truncation stats**: `/stats` endpoint and `giddy stats` now report embedding coverage — how many chunks were truncated and what percentage of content is fully covered.
+
+### Changed
+
+- **BM25 field boosting** (C3): Added `fts_content` column that repeats file path and symbol name 3x before raw content, simulating BM25F field-level boosting. FTS now indexes this enriched column instead of raw content. Benchmarks: test_1 full-text recall 63%→87%, "grid" query ranks `grid.tsx` #1. test_2 Stripe query ranks `stripe.ts` #1. giddyanne hybrid MRR holds at 1.00. Requires `giddy clean --force && giddy up` to rebuild index.
+- **Chunk context enrichment** (C1): Prepend file path and function/class name to chunk content before embedding. Stored content unchanged (search results still show raw code). Benchmarks: giddyanne 75% recall (steady, "configuration and settings" query improved 0%→50%), test_2 80%→87%, test_1 77%→70% (one already-weak query regressed).
+- **Custom RRF with tunable weights** (C2): Replaced LanceDB's black-box `RRFReranker` with our own weighted Reciprocal Rank Fusion. Runs semantic and FTS searches independently, merges ranked lists with configurable weights (semantic 1.2, FTS 0.5). Removes `lancedb.rerankers` dependency from hybrid search. Benchmarks: recall matches semantic-only (giddyanne 75%, test_2 70%, test_1 83%), MRR improved (giddyanne 0.65→1.00, test_2 0.65→0.70).
+
+### Added
+
+- **Quality benchmark script** (`benchmarks/quality.py`): Reusable benchmark for measuring search recall, precision, and MRR across projects and search modes. Supports `--mode all` for side-by-side comparison of semantic, full-text, and hybrid search.
+
 ## [1.4.1] - 2026-02-21
 
 ### Fixed

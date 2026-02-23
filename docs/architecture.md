@@ -2,7 +2,7 @@
 
 How giddyanne works internally. Read this before changing the indexing pipeline, search logic, or server lifecycle.
 
-For user-facing docs, see [README.md](README.md). For dev setup, see [CONTRIBUTING.md](CONTRIBUTING.md).
+For user-facing docs, see the [home page](index.md). For dev setup, see [Contributing](contributing.md).
 
 ## System Overview
 
@@ -10,9 +10,9 @@ For user-facing docs, see [README.md](README.md). For dev setup, see [CONTRIBUTI
 ┌─────────────┐     HTTP      ┌──────────────────────────────────┐
 │  Go CLI     │──────────────▶│  FastAPI Server (http_main.py)   │
 │  (giddy)    │               │                                  │
-└─────────────┘               │  ┌────────┐ ┌────────┐ ┌──────┐  │
-                              │  │ engine │ │chunker │ │embed │  │
-┌─────────────┐  stdio        │  └───┬────┘ └────────┘ └──────┘  │
+└─────────────┘               │  ┌────────┐ ┌────────┐           │
+                              │  │ engine │ │chunker │           │
+┌─────────────┐  stdio        │  └───┬────┘ └────────┘           │
 │ Claude Code │──────────────▶│      │                           │
 │  (MCP)      │               │  ┌───▼────────────┐              │
 └─────────────┘               │  │ LanceDB        │              │
@@ -22,15 +22,27 @@ For user-facing docs, see [README.md](README.md). For dev setup, see [CONTRIBUTI
                               │  │ watchdog       │              │
                               │  │ (file watcher) │              │
                               │  └────────────────┘              │
+                              └───────────┬──────────────────────┘
+                                          │ Unix socket
+                              ┌───────────▼──────────────────────┐
+                              │  Embed Server (embed_server.py)  │
+                              │  Global singleton, one per machine│
+                              │  ┌──────────────────────────┐    │
+                              │  │ sentence-transformers     │    │
+                              │  │ (loads model once ~727MB) │    │
+                              │  └──────────────────────────┘    │
                               └──────────────────────────────────┘
 ```
 
-Two entry points into the same Python core:
+Three entry points into the Python core:
 
-- **`http_main.py`** starts an HTTP server. The Go CLI talks to it over HTTP.
+- **`http_main.py`** starts an HTTP server per project. The Go CLI talks to it over HTTP.
 - **`mcp_main.py`** starts an MCP server over stdio. Claude Code talks to it directly.
+- **`embed_server.py`** is a global singleton that loads the embedding model once and serves all project servers over a Unix socket (`~/.local/state/giddyanne/embed.sock`). Auto-started by project servers, or managed directly via `giddy embed start|stop|status`.
 
-Both call `src/startup.py` to initialize shared components (config, embeddings, vectorstore, indexer), then add their transport layer on top.
+Project servers use `SharedEmbedding` to proxy embed calls to the shared server instead of loading the ~900MB model in-process. This means running 3 projects costs ~727MB (one model) + 3×~180MB (project servers) instead of 3×~900MB. Falls back to in-process `LocalEmbedding` if the shared server is unavailable.
+
+Both `http_main.py` and `mcp_main.py` call `src/startup.py` to initialize shared components (config, embeddings, vectorstore, indexer), then add their transport layer on top.
 
 ## Source Map
 
@@ -40,7 +52,9 @@ All Python source lives in `src/`. Each file has one job:
 |------|-------------|
 | `engine.py` | Orchestrates indexing — file discovery, mtime checks, batch processing. Start here. |
 | `chunker.py` | Splits files into chunks using language-aware separators |
-| `embeddings.py` | Loads the sentence-transformers model, generates embeddings |
+| `embeddings.py` | Embedding providers (local sentence-transformers, shared server, Ollama) |
+| `embed_lifecycle.py` | Start/stop/health-check the shared embedding server |
+| `global_config.py` | Global config loader for `~/.config/giddyanne/config.yaml` |
 | `vectorstore.py` | All LanceDB operations — upsert, delete, search, caching |
 | `watcher.py` | Watches the filesystem for changes, debounces events |
 | `api.py` | FastAPI endpoints (`/search`, `/status`, `/stats`, `/health`) |
@@ -75,12 +89,13 @@ This is the main performance optimization. After the first index, subsequent sta
 
 ### 3. Chunking
 
-Files are split into pieces in `chunker.py`. The chunker uses language-specific separators — for Python, that's `\nclass `, `\ndef `, `\n    def `, etc. It tries each separator in order and uses the first one that produces results.
+Files are split into pieces in `chunker.py`. The chunker uses tree-sitter AST parsing to split code at real node boundaries — functions, classes, and other top-level definitions. Falls back to blank-line splitting for languages without a tree-sitter grammar.
 
 After splitting:
 1. **Small chunks get merged** — consecutive chunks under `min_lines` (default: 10) are combined
 2. **Large chunks get split** — chunks over `max_lines` (default: 50) are broken up with `overlap_lines` (default: 5) lines of overlap
-3. **Fallback** — if no language separators match, it splits on blank lines
+3. **Token-aware splitting** — after line-based chunking, oversized chunks are recursively halved until they fit the model's token budget (256 tokens for MiniLM). This eliminates silent embedding truncation.
+4. **Context enrichment** — each chunk gets file path and function/class name prepended before embedding. The stored content stays raw (search results show code only).
 
 ### 4. Embedding
 
@@ -97,7 +112,7 @@ Chunks are batched (32 per batch) and embedded in a single model call. File read
 Everything is upserted into LanceDB. The schema per row:
 
 ```
-path, chunk_index, start_line, end_line, content, description, mtime,
+path, chunk_index, start_line, end_line, content, fts_content, description, mtime,
 path_embedding[384], content_embedding[384], description_embedding[384]
 ```
 
@@ -109,9 +124,9 @@ Search lives in `vectorstore.py`. There are three modes:
 
 **Semantic** — embeds the query, does vector similarity search against content embeddings, and blends in description embedding scores. The blend is `(1 - desc_weight) * content_score + desc_weight * desc_score` with a default description weight of 0.3.
 
-**Full-text** — BM25 keyword search via LanceDB's built-in FTS index. Pure keyword matching with stemming and stop word removal.
+**Full-text** — BM25 keyword search via LanceDB's built-in FTS index. The index uses an enriched `fts_content` column that repeats file path and symbol name 3x before raw content, simulating BM25F field-level boosting. Pure keyword matching with stemming and stop word removal.
 
-**Hybrid** (default) — runs both, then combines results using Reciprocal Rank Fusion (RRF). Falls back to semantic-only if the FTS index isn't available yet.
+**Hybrid** (default) — runs both, then combines results using Reciprocal Rank Fusion (RRF) with tunable weights (semantic 1.2, FTS 0.5). Results are biased by file category (source 1.0x, tests 0.8x, docs 0.6x) and deduplicated by file (best chunk per file). Falls back to semantic-only if the FTS index isn't available yet.
 
 ### Query Caching
 
@@ -143,7 +158,7 @@ For deletes, it just removes all chunks for that path.
 1. Parse CLI args (`--daemon`, `--port`, `--host`, `--verbose`, `--path`)
 2. Load config from `.giddyanne.yaml` or detect git-only mode
 3. Determine storage directory
-4. Create embedding provider (lazy — model loads on first use)
+4. Create embedding provider (shared embed server > in-process sentence-transformers > Ollama). The shared server is auto-started if not running and `auto_start` is enabled.
 5. Initialize vectorstore (LanceDB)
 6. Start FastAPI server
 7. **Reconcile** — scan the database, remove entries for files that no longer exist or are now excluded
@@ -216,5 +231,3 @@ The database directory includes the model name. This means you can switch embedd
 **Batch everything** — the embedding model call is the bottleneck. Batching 32 chunks into a single `encode()` call is dramatically faster than 32 individual calls. Same principle applies to database upserts.
 
 **Debounced file watching** — editors often trigger multiple write events for a single save (write to temp file, rename, etc.). The 100ms debounce window catches all of these and fires once.
-
-[← Back to README.md](README.md)

@@ -3,21 +3,24 @@
 import pytest
 
 from src.embeddings import (
+    QUERY_PREFIX_BY_MODEL,
     ChunkEmbedding,
     EmbeddingProvider,
     EmbeddingService,
     LocalEmbedding,
+    TruncationStats,
     _needs_trust_remote_code,
-    _query_prefix_for,
+    _prefix_for,
 )
 
 
 class MockEmbeddingProvider(EmbeddingProvider):
     """Mock provider for testing without loading real models."""
 
-    def __init__(self, dimension: int = 384, query_prefix: str = ""):
+    def __init__(self, dimension: int = 384, query_prefix: str = "", max_seq: int = 256):
         self._dimension = dimension
         self._query_prefix = query_prefix
+        self._max_seq = max_seq
 
     @property
     def model_name(self) -> str:
@@ -27,6 +30,13 @@ class MockEmbeddingProvider(EmbeddingProvider):
     def query_prefix(self) -> str:
         return self._query_prefix
 
+    @property
+    def max_seq_length(self) -> int:
+        return self._max_seq
+
+    def token_count(self, text: str) -> int:
+        return len(text.split())
+
     async def embed(self, texts: list[str]) -> list[list[float]]:
         # Return fake embeddings of the right dimension
         # Store last texts for inspection
@@ -35,6 +45,14 @@ class MockEmbeddingProvider(EmbeddingProvider):
 
     def dimension(self) -> int:
         return self._dimension
+
+    def count_truncated(self, texts: list[str]) -> TruncationStats:
+        return TruncationStats(
+            total_texts=len(texts),
+            truncated_texts=0,
+            total_tokens=sum(len(t.split()) for t in texts),
+            embedded_tokens=sum(len(t.split()) for t in texts),
+        )
 
 
 class TestMockProvider:
@@ -112,8 +130,9 @@ class TestEmbeddingService:
         provider = MockEmbeddingProvider(dimension=128)
         service = EmbeddingService(provider)
 
-        results = await service.embed_chunks_batch([])
+        results, trunc = await service.embed_chunks_batch([])
         assert results == []
+        assert trunc.total_texts == 0
 
     @pytest.mark.asyncio
     async def test_embed_chunks_batch_single(self):
@@ -123,9 +142,10 @@ class TestEmbeddingService:
         chunks = [
             ("/path/file.py", 0, 1, 20, "content here", "description", 1234567890.0)
         ]
-        results = await service.embed_chunks_batch(chunks)
+        results, trunc = await service.embed_chunks_batch(chunks)
 
         assert len(results) == 1
+        assert trunc.total_texts == 3  # path + content + description
         assert isinstance(results[0], ChunkEmbedding)
         assert results[0].path == "/path/file.py"
         assert results[0].chunk_index == 0
@@ -148,9 +168,10 @@ class TestEmbeddingService:
             ("/path/file1.py", 1, 21, 40, "content 2", "desc 2", 1234567890.0),
             ("/path/file2.py", 0, 1, 10, "content 3", "", 1234567891.0),
         ]
-        results = await service.embed_chunks_batch(chunks)
+        results, trunc = await service.embed_chunks_batch(chunks)
 
         assert len(results) == 3
+        assert trunc.total_texts == 8  # 3 paths + 3 contents + 2 descriptions
         assert results[0].path == "/path/file1.py"
         assert results[0].chunk_index == 0
         assert results[1].path == "/path/file1.py"
@@ -169,7 +190,7 @@ class TestEmbeddingService:
         chunks = [
             ("/path/empty.py", 0, 1, 1, "", "has description", 1234567890.0),
         ]
-        results = await service.embed_chunks_batch(chunks)
+        results, _trunc = await service.embed_chunks_batch(chunks)
 
         assert len(results) == 1
         assert results[0].content_embedding is None
@@ -178,14 +199,14 @@ class TestEmbeddingService:
 
 class TestQueryPrefix:
     def test_coderankmbed_gets_prefix(self):
-        prefix = _query_prefix_for("nomic-ai/CodeRankEmbed")
+        prefix = _prefix_for("nomic-ai/CodeRankEmbed", QUERY_PREFIX_BY_MODEL)
         assert prefix.startswith("Represent this query")
 
     def test_minilm_gets_no_prefix(self):
-        assert _query_prefix_for("all-MiniLM-L6-v2") == ""
+        assert _prefix_for("all-MiniLM-L6-v2", QUERY_PREFIX_BY_MODEL) == ""
 
     def test_unknown_model_gets_no_prefix(self):
-        assert _query_prefix_for("some-random/model") == ""
+        assert _prefix_for("some-random/model", QUERY_PREFIX_BY_MODEL) == ""
 
     def test_coderankmbed_needs_trust_remote_code(self):
         assert _needs_trust_remote_code("nomic-ai/CodeRankEmbed") is True

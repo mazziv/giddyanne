@@ -14,6 +14,7 @@ from .engine import (
     create_embedding_provider,
 )
 from .project_config import FileFilter, ProjectConfig
+from .reranker import Reranker
 from .vectorstore import VectorStore
 from .watcher import FileWatcher
 
@@ -40,6 +41,7 @@ class AppComponents:
     stats: StatsTracker
     progress: IndexingProgress
     provider: EmbeddingProvider
+    reranker: Reranker | None
 
 
 async def create_components(root_path: Path, project_config: ProjectConfig,
@@ -50,10 +52,21 @@ async def create_components(root_path: Path, project_config: ProjectConfig,
     If log_path is None, it's derived from the resolved db_path using log_filename.
     """
     provider = create_embedding_provider(project_config)
+
+    # Health check for Ollama backend
+    from .embeddings import OllamaEmbedding
+    if isinstance(provider, OllamaEmbedding):
+        await provider.check_health()
+
     embedding_service = EmbeddingService(provider)
 
+    reranker = None
+    if project_config.settings.reranker_model:
+        reranker = Reranker(project_config.settings.reranker_model)
+        logger.info(f"Reranker enabled: {project_config.settings.reranker_model}")
+
     db_path = get_db_path(storage_dir, provider.model_name)
-    vector_store = VectorStore(db_path, provider.dimension())
+    vector_store = VectorStore(db_path, provider.dimension(), reranker=reranker)
     await vector_store.connect()
 
     if log_path is None:
@@ -82,6 +95,7 @@ async def create_components(root_path: Path, project_config: ProjectConfig,
         stats=stats,
         progress=progress,
         provider=provider,
+        reranker=reranker,
     )
 
 

@@ -17,6 +17,25 @@ Add to your project's `.mcp.json` (or global `~/.claude/config.json`):
 
 The `giddy mcp` command finds the project root by walking up to `.giddyanne.yaml`, or falls back to the nearest `.git/` directory.
 
+Optional environment variables for MCP:
+
+| Variable | Description |
+|----------|-------------|
+| `GIDDY_RERANK=1` | Enable cross-encoder reranking |
+| `GIDDY_OLLAMA=1` | Use Ollama for GPU-accelerated embeddings |
+
+```json
+{
+  "mcpServers": {
+    "giddyanne": {
+      "command": "giddy",
+      "args": ["mcp"],
+      "env": { "GIDDY_RERANK": "1", "GIDDY_OLLAMA": "1" }
+    }
+  }
+}
+```
+
 ## Emacs
 
 Requires Emacs 28.1+.
@@ -91,7 +110,7 @@ Requires Node.js 18+ and npm.
 ```bash
 cd giddyanne
 make vscode
-code --install-extension vscode/giddyanne-1.4.1.vsix
+code --install-extension vscode/giddyanne-1.5.0.vsix
 ```
 
 ### Commands
@@ -136,5 +155,4 @@ curl http://localhost:8000/health
 | `/status` | GET | Indexing progress and server state |
 | `/stats` | GET | Index statistics (files, chunks, size) |
 | `/health` | GET | Liveness check |
-
-[← Back to README.md](README.md)
+| `/sitemap` | GET | List all indexed file paths. `?verbose=true` for chunk counts and mtimes |

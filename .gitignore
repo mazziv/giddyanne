@@ -41,7 +41,8 @@ ENV/
 .giddyanne/
 /giddy
 /data
-/docs
+/site
+/scratchpad
 
 # Benchmark configs (except giddyanne default)
 benchmarks/configs/*
@@ -62,3 +63,4 @@ htmlcov/
 .mypy_cache/
 /.claude
 /CLAUDE.md
+.grepai/

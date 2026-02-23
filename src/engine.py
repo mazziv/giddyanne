@@ -6,8 +6,8 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from src.chunker import chunk_content
-from src.embeddings import EmbeddingService, LocalEmbedding
+from src.chunker import Chunk, chunk_content, split_oversized_chunks
+from src.embeddings import EmbeddingService, LocalEmbedding, TruncationStats
 from src.languages import detect_language
 from src.project_config import FileFilter, ProjectConfig
 from src.vectorstore import VectorStore
@@ -21,6 +21,27 @@ EMBED_BATCH_SIZE = 32  # Chunks per embedding batch
 
 # Module-level executor for file I/O
 _file_executor = ThreadPoolExecutor(max_workers=FILE_READ_CONCURRENCY)
+
+
+def _build_context_prefix(rel_path: str, chunk: Chunk) -> str:
+    """Build context prefix for embedding enrichment."""
+    parts = [f"File: {rel_path}"]
+    if chunk.header:
+        parts.append(chunk.header)
+    return " | ".join(parts)
+
+
+def _build_fts_content(rel_path: str, chunk: Chunk, boost: int = 3) -> str:
+    """Build enriched content for FTS indexing with path/symbol boosting.
+
+    Repeats path and symbol name to simulate BM25 field boosting via
+    term frequency. BM25 naturally weights repeated terms higher.
+    """
+    basename = Path(rel_path).name
+    header_part = f" {chunk.header}" if chunk.header else ""
+    boost_line = f"{rel_path} {basename}{header_part}"
+    prefix = "\n".join([boost_line] * boost)
+    return f"{prefix}\n{chunk.content}"
 
 
 async def read_file_async(path: Path) -> tuple[Path, str, float]:
@@ -77,6 +98,10 @@ class StatsTracker:
         self._max_durations = 100  # Keep last N for rolling average
         self._start_time = time.perf_counter()
         self._startup_duration_ms: float | None = None
+        self._total_texts: int = 0
+        self._truncated_texts: int = 0
+        self._total_tokens: int = 0
+        self._embedded_tokens: int = 0
         log_path.parent.mkdir(parents=True, exist_ok=True)
         self._log("START", "server initialized")
 
@@ -150,6 +175,30 @@ class StatsTracker:
     def startup_duration_ms(self) -> float | None:
         """Get startup duration in milliseconds. None if not yet complete."""
         return self._startup_duration_ms
+
+    def record_truncation(self, stats: TruncationStats) -> None:
+        """Accumulate truncation counts from an embedding batch."""
+        self._total_texts += stats.total_texts
+        self._truncated_texts += stats.truncated_texts
+        self._total_tokens += stats.total_tokens
+        self._embedded_tokens += stats.embedded_tokens
+
+    @property
+    def truncation_summary(self) -> dict:
+        """Return truncation summary for stats output."""
+        total = self._total_texts
+        truncated = self._truncated_texts
+        rate = (truncated / total * 100) if total > 0 else 0.0
+        if self._total_tokens > 0:
+            coverage = self._embedded_tokens / self._total_tokens * 100
+        else:
+            coverage = 100.0
+        return {
+            "truncated_chunks": truncated,
+            "total_embedded_texts": total,
+            "truncation_rate": round(rate, 1),
+            "content_coverage_pct": round(coverage, 1),
+        }
 
 
 class FileIndexer:
@@ -231,26 +280,50 @@ class FileIndexer:
                     "content": content,
                 })()]
 
+            # Split oversized chunks to fit the model's token budget
+            try:
+                rel_path = str(path.relative_to(self.root_path))
+            except ValueError:
+                rel_path = str(path)
+
+            provider = self.embedding_service.provider
+            chunks = split_oversized_chunks(
+                chunks,
+                prefix_fn=lambda c: _build_context_prefix(rel_path, c),
+                token_count_fn=provider.token_count,
+                max_tokens=provider.max_seq_length,
+            )
+
             # Embed and store each chunk
             for idx, chunk in enumerate(chunks):
                 logger.debug(
                     f"Embedding chunk {idx + 1}/{len(chunks)} for {path.name} "
                     f"(lines {chunk.start_line}-{chunk.end_line})"
                 )
+                # Enrich content with context prefix for better embeddings
+                embed_content = chunk.content
+                if hasattr(chunk, "header"):
+                    prefix = _build_context_prefix(rel_path, chunk)
+                    embed_content = f"{prefix}\n{chunk.content}"
+                # Build enriched FTS content with path/symbol boosting
+                fts_content = chunk.content
+                if hasattr(chunk, "header"):
+                    fts_content = _build_fts_content(rel_path, chunk)
                 result = await self.embedding_service.embed_file(
-                    str(path), chunk.content, description
+                    str(path), embed_content, description
                 )
                 await self.vector_store.upsert(
                     path=result["path"],
                     chunk_index=idx,
                     start_line=chunk.start_line,
                     end_line=chunk.end_line,
-                    content=result["content"],
+                    content=chunk.content,
                     path_embedding=result["path_embedding"],
                     content_embedding=result["content_embedding"],
                     description=result["description"],
                     description_embedding=result["description_embedding"],
                     mtime=mtime,
+                    fts_content=fts_content,
                 )
 
             if self.stats:
@@ -391,6 +464,10 @@ class FileIndexer:
         read_sem = asyncio.Semaphore(FILE_READ_CONCURRENCY)
         settings = self.project_config.settings
 
+        # Map from (path, chunk_index) -> raw/fts content for upsert
+        raw_contents: dict[tuple[str, int], str] = {}
+        fts_contents: dict[tuple[str, int], str] = {}
+
         async def read_and_chunk(path: Path) -> list[tuple]:
             """Read file and return list of chunk tuples."""
             async with read_sem:
@@ -417,13 +494,40 @@ class FileIndexer:
 
             if not chunks:
                 chunks = [type("Chunk", (), {
-                    "start_line": 1, "end_line": 1, "content": content
+                    "start_line": 1, "end_line": 1, "content": content,
+                    "header": "",
                 })()]
 
-            return [
-                (str(path), idx, c.start_line, c.end_line, c.content, description, mtime)
-                for idx, c in enumerate(chunks)
-            ]
+            # Split oversized chunks to fit the model's token budget
+            try:
+                rel_path = str(path.relative_to(self.root_path))
+            except ValueError:
+                rel_path = str(path)
+
+            provider = self.embedding_service.provider
+            chunks = split_oversized_chunks(
+                chunks,
+                prefix_fn=lambda c: _build_context_prefix(rel_path, c),
+                token_count_fn=provider.token_count,
+                max_tokens=provider.max_seq_length,
+            )
+
+            # Build enriched content for embedding, track raw content for storage
+            result_tuples = []
+            for idx, c in enumerate(chunks):
+                raw = c.content
+                embed_content = raw
+                fts = raw
+                if hasattr(c, "header"):
+                    prefix = _build_context_prefix(rel_path, c)
+                    embed_content = f"{prefix}\n{raw}"
+                    fts = _build_fts_content(rel_path, c)
+                raw_contents[(str(path), idx)] = raw
+                fts_contents[(str(path), idx)] = fts
+                result_tuples.append(
+                    (str(path), idx, c.start_line, c.end_line, embed_content, description, mtime)
+                )
+            return result_tuples
 
         # Read all files in parallel
         all_chunk_lists = await asyncio.gather(
@@ -456,16 +560,19 @@ class FileIndexer:
         ):
             batch = all_chunks[batch_start:batch_start + EMBED_BATCH_SIZE]
             batch_time = time.perf_counter()
-            chunk_embeddings = await self.embedding_service.embed_chunks_batch(batch)
+            chunk_embeddings, trunc_stats = await self.embedding_service.embed_chunks_batch(batch)
+            if self.stats:
+                self.stats.record_truncation(trunc_stats)
 
-            # Batch upsert
+            # Batch upsert (store raw content, not enriched)
             upsert_data = [
                 {
                     "path": ce.path,
                     "chunk_index": ce.chunk_index,
                     "start_line": ce.start_line,
                     "end_line": ce.end_line,
-                    "content": ce.content,
+                    "content": raw_contents.get((ce.path, ce.chunk_index), ce.content),
+                    "fts_content": fts_contents.get((ce.path, ce.chunk_index), ce.content),
                     "description": ce.description,
                     "mtime": ce.mtime,
                     "path_embedding": ce.path_embedding,
@@ -499,5 +606,32 @@ class FileIndexer:
 
 
 def create_embedding_provider(project_config: ProjectConfig):
-    """Create local embedding provider using sentence-transformers."""
+    """Create embedding provider based on project config.
+
+    Priority: Ollama > shared embed server > local (in-process).
+    """
+    if project_config.settings.ollama:
+        from src.embeddings import OllamaEmbedding
+        return OllamaEmbedding(
+            model_name=project_config.settings.ollama_model,
+            base_url=project_config.settings.ollama_url,
+        )
+
+    # Try shared embed server
+    try:
+        from src.embed_lifecycle import ensure_embed_server
+        from src.global_config import GlobalConfig
+
+        config = GlobalConfig.load()
+        if ensure_embed_server(config):
+            from src.embeddings import SharedEmbedding
+            logger.info("Using shared embed server")
+            return SharedEmbedding(
+                socket_path=str(config.socket_path),
+                model_name=project_config.settings.local_model,
+            )
+    except Exception as e:
+        logger.debug(f"Shared embed server unavailable: {e}")
+
+    # Fallback: in-process local embedding
     return LocalEmbedding(model_name=project_config.settings.local_model)

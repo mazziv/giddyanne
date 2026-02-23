@@ -186,6 +186,8 @@ DEFAULT_DB_PATH = ".giddyanne/vectors.lance"
 
 # Embedding defaults
 DEFAULT_LOCAL_MODEL = "all-MiniLM-L6-v2"
+DEFAULT_OLLAMA_URL = "http://localhost:11434"
+DEFAULT_OLLAMA_MODEL = "all-minilm:l6-v2"
 
 
 @dataclass
@@ -206,6 +208,14 @@ class ProjectSettings:
 
     # Embedding model
     local_model: str = DEFAULT_LOCAL_MODEL
+
+    # Ollama backend
+    ollama: bool = False
+    ollama_url: str = DEFAULT_OLLAMA_URL
+    ollama_model: str = DEFAULT_OLLAMA_MODEL
+
+    # Reranker
+    reranker_model: str = ""  # Empty = disabled
 
 
 @dataclass
@@ -256,6 +266,12 @@ class ProjectConfig:
             db_path=settings_data.get("db_path", DEFAULT_DB_PATH),
             # Embedding model
             local_model=settings_data.get("local_model", DEFAULT_LOCAL_MODEL),
+            # Ollama backend
+            ollama=settings_data.get("ollama", False),
+            ollama_url=settings_data.get("ollama_url", DEFAULT_OLLAMA_URL),
+            ollama_model=settings_data.get("ollama_model", DEFAULT_OLLAMA_MODEL),
+            # Reranker
+            reranker_model=settings_data.get("reranker_model", ""),
         )
 
         return cls(paths=paths, settings=settings)

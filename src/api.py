@@ -41,6 +41,9 @@ class StatsResponse(BaseModel):
     index_size_bytes: int
     avg_query_latency_ms: float | None
     startup_duration_ms: float | None
+    truncated_chunks: int | None = None
+    total_embedded_texts: int | None = None
+    content_coverage_pct: float | None = None
     files: dict[str, int]  # path -> chunk count
 
 
@@ -110,6 +113,7 @@ def create_app(
                     results = await vector_store.search(
                         query_embedding,
                         limit=request.limit,
+                        query_text=request.query,
                     )
             return SearchResponse(
                 results=[
@@ -142,12 +146,16 @@ def create_app(
     async def get_stats():
         """Get statistics about indexed files."""
         files = await vector_store.list_all()
+        trunc = stats.truncation_summary if stats else {}
         return StatsResponse(
             indexed_files=len(files),
             total_chunks=sum(files.values()),
             index_size_bytes=vector_store.get_db_size(),
             avg_query_latency_ms=stats.avg_query_latency_ms() if stats else None,
             startup_duration_ms=stats.startup_duration_ms() if stats else None,
+            truncated_chunks=trunc.get("truncated_chunks"),
+            total_embedded_texts=trunc.get("total_embedded_texts"),
+            content_coverage_pct=trunc.get("content_coverage_pct"),
             files=files,
         )
 

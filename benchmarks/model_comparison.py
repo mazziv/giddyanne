@@ -17,7 +17,7 @@ import statistics
 import subprocess
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import yaml
@@ -135,8 +135,9 @@ def write_config(model_name: str):
 
 def time_model_load(model_name: str) -> dict:
     """Time SentenceTransformer load (cached only)."""
-    from src.embeddings import _needs_trust_remote_code
     from sentence_transformers import SentenceTransformer
+
+    from src.embeddings import _needs_trust_remote_code
 
     kwargs = {}
     if _needs_trust_remote_code(model_name):
@@ -298,7 +299,10 @@ def print_summary(report: dict):
     # Load times
     row(
         "Fresh download + load",
-        *[f"{v:.2f}s" if (v := report['models'][m]['model_load']['fresh_load_seconds']) else "skipped" for m in models],
+        *[
+            f"{v:.2f}s" if (v := report['models'][m]['model_load']['fresh_load_seconds'])
+            else "skipped" for m in models
+        ],
     )
     row(
         "Cached load",
@@ -406,7 +410,7 @@ def main():
     original_config = CONFIG_PATH.read_text()
 
     report = {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "project": str(PROJECT_ROOT),
         "models": {},
         "queries": QUERIES,
@@ -425,8 +429,11 @@ def main():
             print("\n[1/5] Model load timing...")
             model_report["model_load"] = time_model_load(model_name)
             load = model_report["model_load"]
-            fresh = f"{load['fresh_load_seconds']:.2f}s" if load["fresh_load_seconds"] else "skipped"
-            print(f"  Fresh: {fresh}, Cached: {load['cached_load_seconds']:.2f}s, Dim: {load['dimension']}")
+            fresh_s = load["fresh_load_seconds"]
+            fresh = f"{fresh_s:.2f}s" if fresh_s else "skipped"
+            cached = load["cached_load_seconds"]
+            dim = load["dimension"]
+            print(f"  Fresh: {fresh}, Cached: {cached:.2f}s, Dim: {dim}")
 
             # 2. Write config and index
             print("\n[2/5] Indexing...")

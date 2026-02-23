@@ -1,6 +1,6 @@
 """Tests for chunker module."""
 
-from src.chunker import Chunk, chunk_content
+from src.chunker import Chunk, chunk_content, split_oversized_chunks
 from src.languages import detect_language
 
 
@@ -10,6 +10,14 @@ class TestChunk:
         assert chunk.start_line == 1
         assert chunk.end_line == 10
         assert chunk.content == "hello\nworld"
+
+    def test_header_defaults_to_empty(self):
+        chunk = Chunk(start_line=1, end_line=10, content="hello")
+        assert chunk.header == ""
+
+    def test_header_set_explicitly(self):
+        chunk = Chunk(start_line=1, end_line=10, content="hello", header="my_func")
+        assert chunk.header == "my_func"
 
 
 class TestChunkContent:
@@ -349,3 +357,182 @@ other: data'''
         assert len(chunks) >= 2
         assert "key: value" in chunks[0].content
         assert "other: data" in chunks[1].content
+
+
+class TestChunkHeaderExtraction:
+    """Tests for header (node name) extraction on chunks."""
+
+    def test_python_function_gets_header(self):
+        content = '''def search(query, limit=10):
+    return results
+
+def index_file(path):
+    pass'''
+        language = detect_language("test.py")
+        chunks = chunk_content(content, language=language, min_lines=1, max_lines=50)
+
+        assert len(chunks) == 2
+        assert chunks[0].header == "search"
+        assert chunks[1].header == "index_file"
+
+    def test_python_class_gets_header(self):
+        content = '''class SearchEngine:
+    def run(self):
+        pass
+
+class VectorStore:
+    def query(self):
+        pass'''
+        language = detect_language("test.py")
+        chunks = chunk_content(content, language=language, min_lines=1, max_lines=50)
+
+        assert len(chunks) == 2
+        assert chunks[0].header == "SearchEngine"
+        assert chunks[1].header == "VectorStore"
+
+    def test_blank_line_chunks_have_empty_header(self):
+        content = '''some text
+more text
+
+other section
+more stuff'''
+        chunks = chunk_content(content, language=None, min_lines=1, max_lines=50)
+
+        for chunk in chunks:
+            assert chunk.header == ""
+
+    def test_merged_chunks_lose_header(self):
+        """When small tree-sitter chunks get merged, header comes from first chunk."""
+        content = '''def a():
+    pass
+
+def b():
+    pass'''
+        language = detect_language("test.py")
+        # min_lines=20 forces merging of the two small functions
+        chunks = chunk_content(content, language=language, min_lines=20, max_lines=50)
+
+        assert len(chunks) == 1
+        # Merged chunk gets the header from the first segment (or empty from merge)
+        # The merge operation creates new Chunk without header, so it defaults to ""
+        assert chunks[0].header == ""
+
+    def test_go_function_gets_header(self):
+        content = '''package main
+
+func Search(query string) []Result {
+    return nil
+}
+
+func Index(path string) error {
+    return nil
+}'''
+        language = detect_language("main.go")
+        chunks = chunk_content(content, language=language, min_lines=1, max_lines=50)
+
+        headers = [c.header for c in chunks]
+        assert "Search" in headers
+        assert "Index" in headers
+
+
+class TestSplitOversizedChunks:
+    """Tests for token-aware chunk splitting."""
+
+    @staticmethod
+    def _word_count(text: str) -> int:
+        """Simple token counter: count words."""
+        return len(text.split())
+
+    @staticmethod
+    def _prefix_fn(chunk: Chunk) -> str:
+        return f"File: test.py | {chunk.header}" if chunk.header else "File: test.py"
+
+    def test_within_budget_passthrough(self):
+        """Chunks within the token budget pass through unchanged."""
+        chunks = [
+            Chunk(start_line=1, end_line=3, content="a b c", header="foo"),
+            Chunk(start_line=4, end_line=6, content="d e f", header="bar"),
+        ]
+        result = split_oversized_chunks(
+            chunks, self._prefix_fn, self._word_count, max_tokens=20,
+        )
+        assert result == chunks
+
+    def test_oversized_chunk_is_split(self):
+        """A chunk exceeding the budget gets split into smaller pieces."""
+        # 10 lines, each with 5 words = 50 words of content
+        lines = ["word1 word2 word3 word4 word5" for _ in range(10)]
+        content = "\n".join(lines)
+        chunk = Chunk(start_line=1, end_line=10, content=content, header="big_func")
+
+        result = split_oversized_chunks(
+            [chunk], self._prefix_fn, self._word_count, max_tokens=30,
+        )
+
+        assert len(result) > 1
+        # All content lines should be preserved
+        all_lines = []
+        for c in result:
+            all_lines.extend(c.content.split("\n"))
+        assert len(all_lines) == 10
+
+    def test_single_line_base_case(self):
+        """A single-line chunk that exceeds the budget is returned as-is."""
+        chunk = Chunk(
+            start_line=1, end_line=1,
+            content="a " * 100,  # way over budget
+            header="huge",
+        )
+        result = split_oversized_chunks(
+            [chunk], self._prefix_fn, self._word_count, max_tokens=10,
+        )
+        assert len(result) == 1
+        assert result[0] is chunk
+
+    def test_header_inheritance(self):
+        """First half inherits header, second half gets empty header."""
+        lines = [f"line {i}" for i in range(10)]
+        content = "\n".join(lines)
+        chunk = Chunk(start_line=1, end_line=10, content=content, header="my_func")
+
+        result = split_oversized_chunks(
+            [chunk], self._prefix_fn, self._word_count, max_tokens=10,
+        )
+
+        assert len(result) >= 2
+        # First result should have the original header
+        assert result[0].header == "my_func"
+        # At least one subsequent chunk should have empty header
+        assert any(c.header == "" for c in result[1:])
+
+    def test_line_numbers_correct(self):
+        """Split chunks should have correct, non-overlapping line numbers."""
+        lines = [f"line {i}" for i in range(20)]
+        content = "\n".join(lines)
+        chunk = Chunk(start_line=10, end_line=29, content=content, header="func")
+
+        result = split_oversized_chunks(
+            [chunk], self._prefix_fn, self._word_count, max_tokens=8,
+        )
+
+        assert len(result) >= 2
+        # Line numbers should be contiguous and cover the original range
+        assert result[0].start_line == 10
+        assert result[-1].end_line == 29
+        # Each chunk's start should follow previous chunk's end
+        for i in range(1, len(result)):
+            assert result[i].start_line == result[i - 1].end_line + 1
+
+    def test_mixed_sizes(self):
+        """Mix of small and large chunks — only large ones get split."""
+        small = Chunk(start_line=1, end_line=2, content="a b", header="small")
+        lines = ["word1 word2 word3 word4 word5" for _ in range(10)]
+        big = Chunk(start_line=3, end_line=12, content="\n".join(lines), header="big")
+
+        result = split_oversized_chunks(
+            [small, big], self._prefix_fn, self._word_count, max_tokens=20,
+        )
+
+        # Small chunk should pass through, big chunk should be split
+        assert result[0] is small
+        assert len(result) > 2

@@ -1,0 +1,68 @@
+site_name: Giddyanne
+site_url: https://giddyanne.upship.ai
+site_description: Semantic codebase search. Find code by meaning, not keywords.
+repo_url: https://github.com/upship-ai/giddyanne
+repo_name: upship-ai/giddyanne
+
+theme:
+  name: material
+  custom_dir: overrides
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: deep blue
+      accent: cyan
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep blue
+      accent: cyan
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.sections
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+  favicon: img/favicon.ico
+  icon:
+    repo: fontawesome/brands/github
+
+extra_css:
+  - stylesheets/extra.css
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.details
+  - admonition
+  - tables
+  - attr_list
+  - toc:
+      permalink: true
+
+plugins:
+  - search
+  - blog:
+      blog_dir: blog
+
+nav:
+  - Home: index.md
+  - Installation: install.md
+  - Configuration: config.md
+  - CLI Reference: cli.md
+  - Searching: searching.md
+  - Integrations: integrations.md
+  - Troubleshooting: troubleshooting.md
+  - Architecture: architecture.md
+  - Contributing: contributing.md
+  - Changelog: changelog.md
+  - Blog:
+    - blog/index.md

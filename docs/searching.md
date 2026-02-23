@@ -80,5 +80,3 @@ When to use each:
 - **Hybrid**: Best for most queries
 - **Semantic**: When you're describing functionality conceptually
 - **Full-text**: When you know specific terms that should appear in the code
-
-[← Back to README.md](README.md)

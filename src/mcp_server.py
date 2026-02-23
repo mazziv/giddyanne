@@ -242,6 +242,15 @@ def create_server() -> Server:
                 startup = _stats.startup_duration_ms()
                 if startup is not None:
                     lines.append(f"Startup time:  {startup:.0f}ms")
+                trunc = _stats.truncation_summary
+                total = trunc["total_embedded_texts"]
+                if total > 0:
+                    truncated = trunc["truncated_chunks"]
+                    coverage = trunc["content_coverage_pct"]
+                    lines.append(
+                        f"Embed coverage: {coverage}% "
+                        f"({truncated}/{total} texts truncated)"
+                    )
             return [TextContent(type="text", text="\n".join(lines))]
 
         if name != "search":
@@ -282,7 +291,9 @@ def create_server() -> Server:
                         query_embedding, query, limit=limit
                     )
                 else:  # semantic
-                    results = await _vector_store.search(query_embedding, limit=limit)
+                    results = await _vector_store.search(
+                        query_embedding, limit=limit, query_text=query
+                    )
             if _stats:
                 _stats.record_search(
                     time.perf_counter() - start, cache_hit=cache_hit, query=query

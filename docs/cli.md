@@ -17,6 +17,7 @@ Run `giddy help` for built-in help.
 | `giddy drop` | Remove search index (keeps logs) |
 | `giddy clean` | Remove all giddyanne data (with confirmation) |
 | `giddy init` | Generate a config file prompt |
+| `giddy embed <sub>` | Manage the shared embedding server (`start`, `stop`, `status`) |
 | `giddy mcp` | Run MCP server (for Claude Code) |
 
 ## Abbreviations
@@ -38,8 +39,10 @@ Commands can be shortened to their prefix:
 
 ```bash
 giddy up --port 9000      # Use specific port
-giddy up --host localhost # Bind to specific host
-giddy up --verbose        # Enable debug logging
+giddy up --host localhost  # Bind to specific host
+giddy up --rerank          # Enable cross-encoder reranking
+giddy up --ollama          # Use Ollama for embeddings (GPU-accelerated)
+giddy up --verbose         # Enable debug logging
 ```
 
 ### Search flags
@@ -51,6 +54,16 @@ giddy find --files-only   # Only show file paths
 giddy find --verbose      # Show full content (no truncation)
 giddy find --semantic     # Semantic search only
 giddy find --full-text    # Full-text search only
+```
+
+### Embed flags
+
+```bash
+giddy embed start             # Start the shared embedding server
+giddy embed start --verbose   # With debug logging
+giddy embed start --model X   # Use a specific model
+giddy embed stop              # Stop the shared embedding server
+giddy embed status            # Show PID and loaded models
 ```
 
 ### Other flags
@@ -85,5 +98,3 @@ giddy completion fish | source
 ```
 
 ![Shell completions](img/autocomplete.png)
-
-[← Back to README.md](README.md)

@@ -5,6 +5,7 @@ classes, etc.) when a language is detected, falling back to blank-line
 splitting for unknown languages or parse failures.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from .languages import LanguageSpec
@@ -17,6 +18,58 @@ class Chunk:
     start_line: int  # 1-indexed
     end_line: int  # 1-indexed, inclusive
     content: str
+    header: str = ""  # e.g. "search" for a function named search
+
+
+def split_oversized_chunks(
+    chunks: list[Chunk],
+    prefix_fn: Callable[[Chunk], str],
+    token_count_fn: Callable[[str], int],
+    max_tokens: int,
+) -> list[Chunk]:
+    """Recursively split chunks that exceed the token budget.
+
+    For each chunk, measures token_count_fn(prefix + "\\n" + chunk.content).
+    If over budget, halves by lines and recurses. Single-line chunks are
+    returned as-is (base case).
+
+    First half inherits the header; second half gets empty header.
+    Line numbers are recomputed from the split point.
+    """
+    result: list[Chunk] = []
+    for chunk in chunks:
+        prefix = prefix_fn(chunk)
+        full_text = f"{prefix}\n{chunk.content}"
+        if token_count_fn(full_text) <= max_tokens:
+            result.append(chunk)
+            continue
+
+        lines = chunk.content.split("\n")
+        if len(lines) <= 1:
+            # Base case: can't split further
+            result.append(chunk)
+            continue
+
+        mid = len(lines) // 2
+        first_half = Chunk(
+            start_line=chunk.start_line,
+            end_line=chunk.start_line + mid - 1,
+            content="\n".join(lines[:mid]),
+            header=chunk.header,
+        )
+        second_half = Chunk(
+            start_line=chunk.start_line + mid,
+            end_line=chunk.end_line,
+            content="\n".join(lines[mid:]),
+            header="",
+        )
+        # Recurse on both halves
+        result.extend(
+            split_oversized_chunks(
+                [first_half, second_half], prefix_fn, token_count_fn, max_tokens
+            )
+        )
+    return result
 
 
 def chunk_content(
@@ -63,6 +116,14 @@ def chunk_content(
     chunks = _split_large_segments(merged, max_lines, overlap)
 
     return chunks
+
+
+def _extract_node_name(node) -> str:
+    """Extract function/class/method name from a tree-sitter node."""
+    for child in node.children:
+        if child.type in ("identifier", "name", "property_identifier"):
+            return child.text.decode("utf-8")
+    return ""
 
 
 def _split_with_treesitter(content: str, language: LanguageSpec) -> list[Chunk] | None:
@@ -142,6 +203,7 @@ def _split_with_treesitter(content: str, language: LanguageSpec) -> list[Chunk] 
                 start_line=start_line,
                 end_line=end_line,
                 content=node_content,
+                header=_extract_node_name(child),
             ))
         else:
             # Accumulate non-matching nodes
