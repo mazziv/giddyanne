@@ -30,6 +30,7 @@ theme:
     - search.suggest
     - search.highlight
     - content.code.copy
+  logo: img/apple-touch-icon.png
   favicon: img/favicon.ico
   icon:
     repo: fontawesome/brands/github
