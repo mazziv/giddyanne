@@ -64,6 +64,10 @@
   .ga-hero {
     padding: 3rem 0;
   }
+  .ga-hero__demo {
+    min-width: 0;
+    max-width: 100%;
+  }
 }
 
 .ga-hero__kicker {
@@ -166,6 +170,7 @@
   border: 1px solid var(--ga-terminal-border);
   border-radius: 10px;
   overflow: hidden;
+  min-width: 0;
 }
 
 .ga-terminal__bar {
@@ -199,6 +204,12 @@
   line-height: 1.65;
   overflow-x: auto;
   white-space: pre;
+}
+
+@media (max-width: 600px) {
+  .ga-terminal__body pre {
+    font-size: 0.68rem;
+  }
 }
 
 .ga-terminal--compact {
@@ -400,6 +411,7 @@
 .ga-quickstart__content {
   max-width: 580px;
   margin: 0 auto;
+  min-width: 0;
 }
 
 .ga-quickstart__note {
@@ -449,6 +461,10 @@
   .ga-bottom__inner {
     grid-template-columns: 1fr;
     gap: 2.5rem;
+  }
+  .ga-bottom__terminal {
+    min-width: 0;
+    max-width: 100%;
   }
 }
 
@@ -510,5 +526,19 @@
 .ga-features {
   padding-left: 1.5rem;
   padding-right: 1.5rem;
+  overflow: hidden;
+}
+
+/* Prevent grid children from overflowing */
+.ga-hero__inner,
+.ga-contrast__grid,
+.ga-bottom__inner {
+  min-width: 0;
+}
+
+.ga-hero__inner > *,
+.ga-contrast__grid > *,
+.ga-bottom__inner > * {
+  min-width: 0;
 }
 
