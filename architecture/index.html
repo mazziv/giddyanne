@@ -1,0 +1,1716 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Semantic codebase search. Find code by meaning, not keywords.">
+      
+      
+      
+        <link rel="canonical" href="https://giddyanne.upship.ai/architecture/">
+      
+      
+        <link rel="prev" href="../integrations/">
+      
+      
+        <link rel="next" href="../contributing/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../img/favicon.ico">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.3">
+    
+    
+      
+        <title>Architecture - Giddyanne</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+<link rel="apple-touch-icon" sizes="180x180" href="../img/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="../img/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="../img/favicon-16x16.png">
+<script type="text/javascript">
+  (function(c,l,a,r,i,t,y){
+    c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+    t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+    y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+  })(window, document, "clarity", "script", "vkngz6nb90");
+</script>
+
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="deep-blue" data-md-color-accent="cyan">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#architecture" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Giddyanne" class="md-header__button md-logo" aria-label="Giddyanne" data-md-component="logo">
+      
+  <img src="../img/apple-touch-icon.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Giddyanne
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Architecture
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="deep-blue" data-md-color-accent="cyan"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="deep-blue" data-md-color-accent="cyan"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/upship-ai/giddyanne" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    upship-ai/giddyanne
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Giddyanne" class="md-nav__button md-logo" aria-label="Giddyanne" data-md-component="logo">
+      
+  <img src="../img/apple-touch-icon.png" alt="logo">
+
+    </a>
+    Giddyanne
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/upship-ai/giddyanne" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    upship-ai/giddyanne
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../install/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../config/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../searching/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Searching
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#system-overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        System Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#source-map" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Source Map
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-indexing-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Indexing Pipeline
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The Indexing Pipeline">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-file-discovery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. File Discovery
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-mtime-comparison" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Mtime Comparison
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-chunking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Chunking
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-embedding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Embedding
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-storage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Storage
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-search-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How Search Works
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How Search Works">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#query-caching" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Query Caching
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#file-watching" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        File Watching
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#startup-sequence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Startup Sequence
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Startup Sequence">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#http-server-http_mainpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        HTTP Server (http_main.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mcp-server-mcp_mainpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MCP Server (mcp_main.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-go-cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Go CLI
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The Go CLI">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#project-discovery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Project Discovery
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#server-discovery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Server Discovery
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#auto-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Auto-start
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#command-matching" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Command Matching
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#storage-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Storage Layout
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#design-decisions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design Decisions
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Community
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Community
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_3" id="__nav_4_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Blog
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Blog
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    
+  
+  
+    <li class="md-nav__item">
+      <a href="../blog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Blog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Archive
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#system-overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        System Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#source-map" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Source Map
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-indexing-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Indexing Pipeline
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The Indexing Pipeline">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-file-discovery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. File Discovery
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-mtime-comparison" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Mtime Comparison
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-chunking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Chunking
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-embedding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Embedding
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-storage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Storage
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-search-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How Search Works
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How Search Works">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#query-caching" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Query Caching
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#file-watching" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        File Watching
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#startup-sequence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Startup Sequence
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Startup Sequence">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#http-server-http_mainpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        HTTP Server (http_main.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mcp-server-mcp_mainpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MCP Server (mcp_main.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-go-cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Go CLI
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The Go CLI">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#project-discovery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Project Discovery
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#server-discovery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Server Discovery
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#auto-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Auto-start
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#command-matching" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Command Matching
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#storage-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Storage Layout
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#design-decisions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design Decisions
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="architecture">Architecture<a class="headerlink" href="#architecture" title="Permanent link">&para;</a></h1>
+<p>How giddyanne works internally. Read this before changing the indexing pipeline, search logic, or server lifecycle.</p>
+<p>For user-facing docs, see the <a href="../">home page</a>. For dev setup, see <a href="../contributing/">Contributing</a>.</p>
+<h2 id="system-overview">System Overview<a class="headerlink" href="#system-overview" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>┌─────────────┐     HTTP      ┌──────────────────────────────────┐
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>│  Go CLI     │──────────────▶│  FastAPI Server (http_main.py)   │
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>│  (giddy)    │               │                                  │
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>└─────────────┘               │  ┌────────┐ ┌────────┐           │
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>                              │  │ engine │ │chunker │           │
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>┌─────────────┐  stdio        │  └───┬────┘ └────────┘           │
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>│ Claude Code │──────────────▶│      │                           │
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>│  (MCP)      │               │  ┌───▼────────────┐              │
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>└─────────────┘               │  │ LanceDB        │              │
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>                              │  │ (vectorstore)  │              │
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>                              │  └────────────────┘              │
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>                              │  ┌────────────────┐              │
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>                              │  │ watchdog       │              │
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>                              │  │ (file watcher) │              │
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>                              │  └────────────────┘              │
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>                              └───────────┬──────────────────────┘
+<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>                                          │ Unix socket
+<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>                              ┌───────────▼──────────────────────┐
+<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>                              │  Embed Server (embed_server.py)  │
+<a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>                              │  Global singleton, one per machine│
+<a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>                              │  ┌──────────────────────────┐    │
+<a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>                              │  │ sentence-transformers     │    │
+<a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>                              │  │ (loads model once ~727MB) │    │
+<a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>                              │  └──────────────────────────┘    │
+<a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>                              └──────────────────────────────────┘
+</code></pre></div>
+<p>Three entry points into the Python core:</p>
+<ul>
+<li><strong><code>http_main.py</code></strong> starts an HTTP server per project. The Go CLI talks to it over HTTP.</li>
+<li><strong><code>mcp_main.py</code></strong> starts an MCP server over stdio. Claude Code talks to it directly.</li>
+<li><strong><code>embed_server.py</code></strong> is a global singleton that loads the embedding model once and serves all project servers over a Unix socket (<code>~/.local/state/giddyanne/embed.sock</code>). Auto-started by project servers, or managed directly via <code>giddy embed start|stop|status</code>.</li>
+</ul>
+<p>Project servers use <code>SharedEmbedding</code> to proxy embed calls to the shared server instead of loading the ~900MB model in-process. This means running 3 projects costs ~727MB (one model) + 3×~180MB (project servers) instead of 3×~900MB. Falls back to in-process <code>LocalEmbedding</code> if the shared server is unavailable.</p>
+<p>Both <code>http_main.py</code> and <code>mcp_main.py</code> call <code>src/startup.py</code> to initialize shared components (config, embeddings, vectorstore, indexer), then add their transport layer on top.</p>
+<h2 id="source-map">Source Map<a class="headerlink" href="#source-map" title="Permanent link">&para;</a></h2>
+<p>All Python source lives in <code>src/</code>. Each file has one job:</p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>engine.py</code></td>
+<td>Orchestrates indexing — file discovery, mtime checks, batch processing. Start here.</td>
+</tr>
+<tr>
+<td><code>chunker.py</code></td>
+<td>Splits files into chunks using language-aware separators</td>
+</tr>
+<tr>
+<td><code>embeddings.py</code></td>
+<td>Embedding providers (local sentence-transformers, shared server, Ollama)</td>
+</tr>
+<tr>
+<td><code>embed_lifecycle.py</code></td>
+<td>Start/stop/health-check the shared embedding server</td>
+</tr>
+<tr>
+<td><code>global_config.py</code></td>
+<td>Global config loader for <code>~/.config/giddyanne/config.yaml</code></td>
+</tr>
+<tr>
+<td><code>vectorstore.py</code></td>
+<td>All LanceDB operations — upsert, delete, search, caching</td>
+</tr>
+<tr>
+<td><code>watcher.py</code></td>
+<td>Watches the filesystem for changes, debounces events</td>
+</tr>
+<tr>
+<td><code>api.py</code></td>
+<td>FastAPI endpoints (<code>/search</code>, <code>/status</code>, <code>/stats</code>, <code>/health</code>)</td>
+</tr>
+<tr>
+<td><code>mcp_server.py</code></td>
+<td>MCP tool definitions for Claude Code</td>
+</tr>
+<tr>
+<td><code>startup.py</code></td>
+<td>Shared initialization — creates components, runs indexing, signal handlers</td>
+</tr>
+<tr>
+<td><code>project_config.py</code></td>
+<td>Loads <code>.giddyanne.yaml</code>, applies file filters, handles git-only mode</td>
+</tr>
+<tr>
+<td><code>languages.py</code></td>
+<td>Language definitions — extensions and chunk separators for 24 languages</td>
+</tr>
+<tr>
+<td><code>errors.py</code></td>
+<td>Custom exceptions</td>
+</tr>
+</tbody>
+</table>
+<p>The Go CLI is a single file: <code>cmd/giddy/main.go</code>.</p>
+<h2 id="the-indexing-pipeline">The Indexing Pipeline<a class="headerlink" href="#the-indexing-pipeline" title="Permanent link">&para;</a></h2>
+<p>This is the core of the system. It runs on startup and again whenever files change.</p>
+<h3 id="1-file-discovery">1. File Discovery<a class="headerlink" href="#1-file-discovery" title="Permanent link">&para;</a></h3>
+<p>The engine walks configured paths using <code>rglob("*")</code>. Each candidate goes through <code>FileFilter.should_include()</code> in <code>project_config.py</code>:</p>
+<ul>
+<li>Does it have a supported extension? (defined in <code>languages.py</code>)</li>
+<li>Is it under the max file size? (default: 1MB)</li>
+<li>Does it match a <code>.gitignore</code> pattern? (auto-loaded)</li>
+<li>Does it match any configured <code>ignore_patterns</code>?</li>
+</ul>
+<p>Files that pass all checks become indexing candidates.</p>
+<h3 id="2-mtime-comparison">2. Mtime Comparison<a class="headerlink" href="#2-mtime-comparison" title="Permanent link">&para;</a></h3>
+<p>Before reading or embedding anything, the engine does a single bulk query to load all stored mtimes from the database (<code>get_all_mtimes()</code>). Each file's current mtime is compared against what's stored. Unchanged files are skipped entirely.</p>
+<p>This is the main performance optimization. After the first index, subsequent startups only process files that actually changed.</p>
+<h3 id="3-chunking">3. Chunking<a class="headerlink" href="#3-chunking" title="Permanent link">&para;</a></h3>
+<p>Files are split into pieces in <code>chunker.py</code>. The chunker uses tree-sitter AST parsing to split code at real node boundaries — functions, classes, and other top-level definitions. Falls back to blank-line splitting for languages without a tree-sitter grammar.</p>
+<p>After splitting:
+1. <strong>Small chunks get merged</strong> — consecutive chunks under <code>min_lines</code> (default: 10) are combined
+2. <strong>Large chunks get split</strong> — chunks over <code>max_lines</code> (default: 50) are broken up with <code>overlap_lines</code> (default: 5) lines of overlap
+3. <strong>Token-aware splitting</strong> — after line-based chunking, oversized chunks are recursively halved until they fit the model's token budget (256 tokens for MiniLM). This eliminates silent embedding truncation.
+4. <strong>Context enrichment</strong> — each chunk gets file path and function/class name prepended before embedding. The stored content stays raw (search results show code only).</p>
+<h3 id="4-embedding">4. Embedding<a class="headerlink" href="#4-embedding" title="Permanent link">&para;</a></h3>
+<p>Each chunk gets <strong>three embeddings</strong> (384-dimensional vectors from <code>all-MiniLM-L6-v2</code>):</p>
+<ul>
+<li><strong>path_embedding</strong> — the file path. Helps queries like "tests for auth" find test files.</li>
+<li><strong>content_embedding</strong> — the actual code. This is the primary search signal.</li>
+<li><strong>description_embedding</strong> — from the config's path description (e.g., "Authentication and session management"). Gives the model extra context about what this code is for.</li>
+</ul>
+<p>Chunks are batched (32 per batch) and embedded in a single model call. File reads are parallelized with an asyncio semaphore (16 concurrent). The goal is to minimize the number of model invocations — that's where the time goes.</p>
+<h3 id="5-storage">5. Storage<a class="headerlink" href="#5-storage" title="Permanent link">&para;</a></h3>
+<p>Everything is upserted into LanceDB. The schema per row:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>path, chunk_index, start_line, end_line, content, fts_content, description, mtime,
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>path_embedding[384], content_embedding[384], description_embedding[384]
+</code></pre></div>
+<p>Each file produces multiple rows (one per chunk). When a file is re-indexed, all its existing rows are deleted first, then the new chunks are inserted.</p>
+<h2 id="how-search-works">How Search Works<a class="headerlink" href="#how-search-works" title="Permanent link">&para;</a></h2>
+<p>Search lives in <code>vectorstore.py</code>. There are three modes:</p>
+<p><strong>Semantic</strong> — embeds the query, does vector similarity search against content embeddings, and blends in description embedding scores. The blend is <code>(1 - desc_weight) * content_score + desc_weight * desc_score</code> with a default description weight of 0.3.</p>
+<p><strong>Full-text</strong> — BM25 keyword search via LanceDB's built-in FTS index. The index uses an enriched <code>fts_content</code> column that repeats file path and symbol name 3x before raw content, simulating BM25F field-level boosting. Pure keyword matching with stemming and stop word removal.</p>
+<p><strong>Hybrid</strong> (default) — runs both, then combines results using Reciprocal Rank Fusion (RRF) with tunable weights (semantic 1.2, FTS 0.5). Results are biased by file category (source 1.0x, tests 0.8x, docs 0.6x) and deduplicated by file (best chunk per file). Falls back to semantic-only if the FTS index isn't available yet.</p>
+<h3 id="query-caching">Query Caching<a class="headerlink" href="#query-caching" title="Permanent link">&para;</a></h3>
+<p>Query embeddings are cached in a separate LanceDB table. If you search for "auth logic" twice, the second time skips the embedding step entirely. The cache tracks hit counts and last-used timestamps.</p>
+<h2 id="file-watching">File Watching<a class="headerlink" href="#file-watching" title="Permanent link">&para;</a></h2>
+<p>The watcher (<code>watcher.py</code>) uses the <code>watchdog</code> library to monitor configured paths for filesystem events.</p>
+<p>Key behaviors:
+- <strong>Debouncing</strong> — events are coalesced over a 100ms window. If you save a file three times in quick succession, it only re-indexes once.
+- <strong>Event precedence</strong> — DELETE &gt; CREATED &gt; MODIFIED. If a file is created and then deleted within the debounce window, only the delete fires.
+- <strong>Filtering</strong> — events are checked against <code>FileFilter.matches_path()</code> before processing. Changes to ignored files are silently dropped.
+- <strong>Async bridge</strong> — watchdog is synchronous, so the watcher bridges events into the async event loop for the indexer callback.</p>
+<p>When a file change fires:
+1. Delete all existing chunks for that path
+2. Re-read the file
+3. Re-chunk with language-aware splitting
+4. Re-embed all chunks
+5. Upsert to the database</p>
+<p>For deletes, it just removes all chunks for that path.</p>
+<h2 id="startup-sequence">Startup Sequence<a class="headerlink" href="#startup-sequence" title="Permanent link">&para;</a></h2>
+<h3 id="http-server-http_mainpy">HTTP Server (<code>http_main.py</code>)<a class="headerlink" href="#http-server-http_mainpy" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Parse CLI args (<code>--daemon</code>, <code>--port</code>, <code>--host</code>, <code>--verbose</code>, <code>--path</code>)</li>
+<li>Load config from <code>.giddyanne.yaml</code> or detect git-only mode</li>
+<li>Determine storage directory</li>
+<li>Create embedding provider (shared embed server &gt; in-process sentence-transformers &gt; Ollama). The shared server is auto-started if not running and <code>auto_start</code> is enabled.</li>
+<li>Initialize vectorstore (LanceDB)</li>
+<li>Start FastAPI server</li>
+<li><strong>Reconcile</strong> — scan the database, remove entries for files that no longer exist or are now excluded</li>
+<li><strong>Index</strong> — discover files, skip unchanged (mtime), index the rest</li>
+<li>Start file watcher</li>
+</ol>
+<p>In daemon mode, the server spawns a new process with <code>subprocess.Popen</code> (not fork — sentence-transformers uses threading internally, and threading + fork don't mix). It writes a PID file and redirects output to a log file.</p>
+<h3 id="mcp-server-mcp_mainpy">MCP Server (<code>mcp_main.py</code>)<a class="headerlink" href="#mcp-server-mcp_mainpy" title="Permanent link">&para;</a></h3>
+<p>Same initialization, but runs indexing synchronously on startup (needs the index ready before Claude starts querying) and exposes MCP tools over stdio instead of HTTP.</p>
+<h2 id="the-go-cli">The Go CLI<a class="headerlink" href="#the-go-cli" title="Permanent link">&para;</a></h2>
+<p>The CLI (<code>cmd/giddy/main.go</code>) is a thin HTTP client. It doesn't do any indexing or embedding — it just talks to the Python server.</p>
+<h3 id="project-discovery">Project Discovery<a class="headerlink" href="#project-discovery" title="Permanent link">&para;</a></h3>
+<p>When you run <code>giddy</code>, it walks up from your current directory looking for:
+1. A <code>.giddyanne.yaml</code> file (config mode)
+2. A <code>.git/</code> directory (git-only mode)</p>
+<p>This determines the project root and where to look for the server's storage directory.</p>
+<h3 id="server-discovery">Server Discovery<a class="headerlink" href="#server-discovery" title="Permanent link">&para;</a></h3>
+<p>The CLI looks for <code>.pid</code> files in the storage directory. The filename encodes the host and port (e.g., <code>-8000.pid</code> for default settings). It reads the PID, checks if the process is alive (<code>kill(pid, 0)</code>), and hits <code>/health</code> to verify.</p>
+<h3 id="auto-start">Auto-start<a class="headerlink" href="#auto-start" title="Permanent link">&para;</a></h3>
+<p><code>giddy find</code> will start the server automatically if it's not running. It locates the Python venv relative to the <code>giddy</code> binary's installation directory, spawns the server in daemon mode, and polls <code>/health</code> every 500ms until it's ready.</p>
+<h3 id="command-matching">Command Matching<a class="headerlink" href="#command-matching" title="Permanent link">&para;</a></h3>
+<p>Commands can be abbreviated to any unambiguous prefix — <code>giddy f</code> for <code>find</code>, <code>giddy st</code> for <code>status</code>, etc.</p>
+<h2 id="storage-layout">Storage Layout<a class="headerlink" href="#storage-layout" title="Permanent link">&para;</a></h2>
+<p>Where files end up depends on whether you have a config file:</p>
+<p><strong>Config mode</strong> (<code>.giddyanne.yaml</code> exists):
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>&lt;project&gt;/.giddyanne/
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>├── all-MiniLM-L6-v2/     # Named after the embedding model
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>│   └── vectors.lance/    # LanceDB database
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>├── -8000.log             # Server log (host-port.log)
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>└── -8000.pid             # Server PID (host-port.pid)
+</code></pre></div></p>
+<p><strong>Git-only mode</strong> (no config):
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>$TMPDIR/giddyanne/&lt;project&gt;-&lt;hash&gt;/
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>└── (same structure)
+</code></pre></div></p>
+<p>The hash is the first 8 characters of SHA256 of the absolute project path — deterministic, so the same project always gets the same storage location.</p>
+<p>The database directory includes the model name. This means you can switch embedding models without corrupting existing indexes — each model gets its own database.</p>
+<h2 id="design-decisions">Design Decisions<a class="headerlink" href="#design-decisions" title="Permanent link">&para;</a></h2>
+<p><strong>Three embeddings per chunk</strong> — path, content, and description each capture different signals. A query like "test helpers" benefits from the path embedding matching <code>tests/helpers.py</code>. A query like "authentication" benefits from the description embedding if the config says "auth and session management". Content embedding does the heavy lifting for everything else.</p>
+<p><strong>Mtime-based skip</strong> — comparing timestamps is cheap. Re-embedding is expensive. This single optimization makes re-indexing fast enough that you barely notice it on startup.</p>
+<p><strong>Subprocess, not fork</strong> — sentence-transformers loads PyTorch, which uses threads internally. Forking a threaded process is undefined behavior on most platforms. <code>Popen</code> spawns a clean new process.</p>
+<p><strong>LanceDB</strong> — it's an embedded database (no separate server process), stores data in Apache Arrow format, and supports both vector search and full-text search. One less thing to install and manage.</p>
+<p><strong>Batch everything</strong> — the embedding model call is the bottleneck. Batching 32 chunks into a single <code>encode()</code> call is dramatically faster than 32 individual calls. Same principle applies to database upserts.</p>
+<p><strong>Debounced file watching</strong> — editors often trigger multiple write events for a single save (write to temp file, rename, etc.). The 100ms debounce window catches all of these and fires once.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  <a href="https://upship.ai">Upship AI</a> ·
+  <a href="https://upship.ai/privacy.html">Privacy</a> ·
+  <a href="https://upship.ai/term.html">Terms</a>
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.top", "search.suggest", "search.highlight", "content.code.copy"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": "1.6.0"}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
