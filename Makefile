@@ -1,6 +1,6 @@
 .PHONY: all go python vscode install clean qa
 
-BIN_DIR := $(HOME)/bin
+BIN_DIR := $(HOME)/.local/bin
 VERSION := $(shell grep '^version' pyproject.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
 GO_SOURCES := $(shell find cmd -name '*.go') go.mod
 VSCODE_SOURCES := $(shell find vscode/src -name '*.ts') vscode/package.json

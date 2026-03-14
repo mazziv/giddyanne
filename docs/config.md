@@ -87,7 +87,7 @@ settings:
     - "vendor/"
 
   # Server
-  host: "0.0.0.0"                  # Bind address
+  host: "127.0.0.1"                # Bind address
   port: 8000                        # HTTP port
 
   # Chunking (defaults work well for most codebases)
@@ -127,7 +127,7 @@ settings:
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `host` | "0.0.0.0" | Network interface to bind to |
+| `host` | "127.0.0.1" | Network interface to bind to |
 | `port` | 8000 | HTTP port for the server |
 
 ### Chunking

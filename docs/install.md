@@ -5,7 +5,7 @@
 ## Prerequisites
 
 - Python 3.11+
-- Go 1.21+ (or use pre-built binary)
+- Go 1.18+ (or use pre-built binary)
 
 ## Build from Source
 

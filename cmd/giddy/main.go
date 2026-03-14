@@ -25,7 +25,7 @@ var Version = "dev"
 
 const (
 	pollInterval = 500 * time.Millisecond
-	defaultHost  = "0.0.0.0"
+	defaultHost  = "127.0.0.1"
 	defaultPort  = 8000
 )
 
@@ -2070,6 +2070,8 @@ complete -c giddy -n '__fish_seen_subcommand_from clean cl' -l force -d 'Skip co
 complete -c giddy -n '__fish_seen_subcommand_from completion com' -a 'bash zsh fish' -d 'Shell type'
 `
 
+var errStopWalk = errors.New("stop walk")
+
 func gatherSourceFiles(root string) string {
 	var files []string
 	extensions := map[string]bool{
@@ -2113,7 +2115,7 @@ func gatherSourceFiles(root string) string {
 
 		// Limit to 50 files
 		if len(files) >= 50 {
-			return filepath.SkipAll
+			return errStopWalk
 		}
 		return nil
 	})
